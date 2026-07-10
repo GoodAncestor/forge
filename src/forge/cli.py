@@ -27,7 +27,10 @@ def build_parser():
     from forge import data
     data.register(sub)
 
-    # later tasks append: from forge import run, envupdate
+    from forge import run as run_mod
+    run_mod.register(sub)
+
+    # later tasks append: from forge import envupdate
     # and call <module>.register(sub)
     return p
 
