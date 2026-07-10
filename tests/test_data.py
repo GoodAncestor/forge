@@ -48,3 +48,15 @@ def test_data_list_cli(capsys):
     assert rc == 0
     out = json.loads(capsys.readouterr().out)
     assert all(e["tier"] == "sft-preference" for e in out["datasets"])
+
+
+def test_save_manifest_preserves_header(tmp_path):
+    p = tmp_path / "m.yaml"
+    entries = [{"name": "x", "source": "hf://a/b", "tier": "pretraining",
+                "license": "l", "approved": False, "size_bytes": None,
+                "nas_path": "x/"}]
+    data.save_manifest(entries, p)
+    text = p.read_text()
+    assert text.startswith("# forge dataset archive manifest.")
+    assert "flipped ONLY by Colby" in text
+    assert data.load_manifest(p)[0]["name"] == "x"

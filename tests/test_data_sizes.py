@@ -1,9 +1,16 @@
+import pytest
+
 from forge import data
 
 
 class Sib:
     def __init__(self, size):
         self.size = size
+
+
+class FakeResponse:
+    def raise_for_status(self):
+        pass
 
 
 class FakeApi:
@@ -36,11 +43,24 @@ def test_measure_hf_model_repo(monkeypatch):
 
 
 def test_measure_url_head(monkeypatch):
-    class R:
+    class R(FakeResponse):
         headers = {"Content-Length": "12345"}
     monkeypatch.setattr(data.requests, "head", lambda *a, **k: R())
     e = {"name": "x", "source": "url://https://example.org/f.bz2", "nas_path": "x/"}
     assert data.measure_entry(e) == 12345
+
+
+def test_measure_url_error_status_rejected(monkeypatch):
+    import requests as req
+
+    class R(FakeResponse):
+        headers = {"Content-Length": "135"}
+        def raise_for_status(self):
+            raise req.HTTPError("403 Client Error")
+    monkeypatch.setattr(data.requests, "head", lambda *a, **k: R())
+    e = {"name": "x", "source": "url://https://example.org/f.bz2", "nas_path": "x/"}
+    with pytest.raises(req.HTTPError):
+        data.measure_entry(e)
 
 
 def test_measure_rsync_source_returns_none():

@@ -1,3 +1,7 @@
+# forge dataset archive manifest.
+# approved: flipped ONLY by Colby (or an explicitly authorized human decision).
+# size_bytes: written by `forge data sizes` — never hand-edited.
+# nas_path: relative to FORGE_DATA_ROOT; no absolute paths, no '..'.
 datasets:
 - name: nemotron-cc
   source: hf://nvidia/Nemotron-CC-v2.1

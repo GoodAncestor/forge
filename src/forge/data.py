@@ -13,6 +13,13 @@ TIERS = frozenset({"nvidia-open-models", "pretraining", "sft-preference",
                    "historical-1930-1980", "classifiers-quality"})
 REQUIRED = {"name", "source", "tier", "license", "approved", "size_bytes", "nas_path"}
 
+MANIFEST_HEADER = """\
+# forge dataset archive manifest.
+# approved: flipped ONLY by Colby (or an explicitly authorized human decision).
+# size_bytes: written by `forge data sizes` — never hand-edited.
+# nas_path: relative to FORGE_DATA_ROOT; no absolute paths, no '..'.
+"""
+
 
 class ManifestError(ValueError):
     pass
@@ -47,7 +54,7 @@ def load_manifest(path=None):
 
 def save_manifest(entries, path=None):
     Path(path or MANIFEST_PATH).write_text(
-        yaml.safe_dump({"datasets": entries}, sort_keys=False, allow_unicode=True))
+        MANIFEST_HEADER + yaml.safe_dump({"datasets": entries}, sort_keys=False, allow_unicode=True))
 
 
 def entry_dir(entry, root=None):
@@ -83,6 +90,7 @@ def measure_entry(entry, token=None):
     # User-Agent is set — send one so measured sizes are real, not error pages.
     r = requests.head(url, allow_redirects=True, timeout=30,
                        headers={"User-Agent": "forge-data-archive/1.0"})
+    r.raise_for_status()
     cl = r.headers.get("Content-Length")
     return int(cl) if cl else None
 
