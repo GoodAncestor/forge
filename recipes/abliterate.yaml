@@ -1,0 +1,11 @@
+name: abliterate
+profile: cuda-blackwell
+method: abliterate
+model_path: CHANGE-ME/relative-to-model-root
+datasets: []
+command: ["python", "-m", "forge.surgery.abliterate", "--recipe", "{recipe_path}", "--run-dir", "{run_dir}"]
+params:
+  max_refusals: 0
+  tool_cmd: null
+grace_sec: 600
+push_to_hf: false

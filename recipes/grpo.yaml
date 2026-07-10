@@ -1,0 +1,17 @@
+name: grpo
+profile: cuda-blackwell
+method: grpo
+model_path: CHANGE-ME/relative-to-model-root
+datasets: []
+command: ["python", "-m", "forge.train.grpo", "--recipe", "{recipe_path}", "--run-dir", "{run_dir}"]
+params:
+  dataset_path: null
+  num_generations: 8
+  learning_rate: 1.0e-6
+  max_seq_length: 2048
+  per_device_batch: 2
+  grad_accum: 8
+  save_steps: 250
+  reward_module: null
+grace_sec: 600
+push_to_hf: false

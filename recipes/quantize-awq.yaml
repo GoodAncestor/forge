@@ -1,0 +1,10 @@
+name: quantize-awq
+profile: cuda-blackwell
+method: quantize-awq
+model_path: CHANGE-ME/relative-to-model-root
+datasets: []
+command: ["python", "-m", "forge.quant.compress", "--recipe", "{recipe_path}", "--run-dir", "{run_dir}"]
+params:
+  scheme: W4A16_AWQ
+grace_sec: 300
+push_to_hf: false
