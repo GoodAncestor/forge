@@ -49,10 +49,13 @@ def main(argv=None):
 
     cfg = DPOConfig(
         output_dir=str(ck_dir),
+        max_steps=p.get("max_steps", -1),
+        num_train_epochs=p.get("epochs", 1),
         per_device_train_batch_size=p.get("per_device_batch", 2),
         gradient_accumulation_steps=p.get("grad_accum", 8),
         learning_rate=p.get("learning_rate", 5e-6),
         lr_scheduler_type="cosine",
+        warmup_steps=p.get("warmup_steps", 100),
         weight_decay=0.01,
         bf16=True,
         optim="adamw_8bit",

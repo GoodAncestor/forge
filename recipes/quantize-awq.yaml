@@ -5,6 +5,7 @@ model_path: CHANGE-ME/relative-to-model-root
 datasets: []
 command: ["python", "-m", "forge.quant.compress", "--recipe", "{recipe_path}", "--run-dir", "{run_dir}"]
 params:
-  scheme: W4A16_AWQ
+  # W4A16 = GPTQ-style 4-bit preset (compressed-tensors). True AWQ requires an AWQModifier + calibration dataset — extend forge.quant.compress before using AWQ proper.
+  scheme: W4A16
 grace_sec: 300
 push_to_hf: false

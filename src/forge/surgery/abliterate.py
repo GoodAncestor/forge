@@ -30,4 +30,10 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except Exception as e:
+        print(f"FAILED: {type(e).__name__}: {e}", file=sys.stderr)
+        sys.exit(common.EXIT_JOB)
