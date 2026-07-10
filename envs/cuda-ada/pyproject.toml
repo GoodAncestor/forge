@@ -1,0 +1,53 @@
+[project]
+name = "forge-env-cuda-ada"
+version = "0"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "torch",
+  "transformers",
+  "datasets",
+  "accelerate",
+  "peft",
+  "trl",
+  "bitsandbytes",
+  "unsloth>=2025",
+  "deepspeed",
+  "sentencepiece",
+  "llmcompressor",
+  "gptqmodel",
+  "lm-eval",
+  "hf-transfer",
+]
+
+# NOT included, by design:
+# - flash-attn, xformers: installed by bootstrap/fleet-node.sh (Task 13) with
+#   --no-build-isolation on the target node — they don't resolve cleanly in a
+#   cross-platform lock. Do NOT add them here.
+# - vllm: pins its own torch; keep it OUT of these projects (eval serving uses
+#   the fleet's existing vllm installs). lm-eval is enough for local eval.
+# - llama.cpp: compiled by bootstrap, not pip.
+#
+# unsloth is pinned >=2025 (not bare): unsloth<2025 (e.g. 2024.8) ships with
+# its real dependencies (torch/transformers/trl/peft/bitsandbytes) gated
+# behind pip extras, so an unqualified "unsloth" resolves to an empty-deps
+# shell of ~2yr-old code whenever anything else in the graph conflicts with
+# current unsloth's pins — a silent capability loss, not a real install. The
+# floor keeps the resolver on a real, current unsloth release.
+
+[tool.uv]
+override-dependencies = []
+# Lock is restricted to Linux: these projects only ever run on the fleet's
+# Linux GPU nodes (Task 11's runner uses `uv run --project envs/<profile>`
+# there), the cu128 torch index has no macOS wheels, and without this
+# restriction uv's universal resolver drags in macOS/Windows-only branches
+# (e.g. unsloth-zoo's mac-only mlx-vlm dependency) that produce spurious
+# cross-platform conflicts unrelated to the real deployment target.
+environments = ["sys_platform == 'linux'"]
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
