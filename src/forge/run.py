@@ -32,7 +32,6 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
 
     run_dir = Path(run_root or REPO_ROOT / "runs") / \
         f"{recipe['name']}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
-    run_dir.mkdir(parents=True, exist_ok=True)
     inner = recipes.render_command(recipe, run_dir=run_dir, recipe_path=Path(recipe_path))
     if use_uv_project:
         cmd = ["uv", "run", "--project", str(REPO_ROOT / "envs" / recipe["profile"]),
@@ -42,6 +41,8 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
     if dry_run:
         emit({"dry_run": True, "cmd": cmd, "run_dir": str(run_dir)}, as_json)
         return EXIT_OK
+
+    run_dir.mkdir(parents=True, exist_ok=True)
 
     client, lease, hb = None, None, None
     if not off_fleet:
@@ -55,7 +56,7 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
                       f"--name {models[0]} --min-floor 1", file=sys.stderr)
             target_name = gpu_name if target_type == "gpu" else host
             lease = client.acquire(config.HOLDER, target_type, target_name,
-                                   ttl_sec=28800,
+                                   mode="exclusive", ttl_sec=28800,
                                    notes=f"forge run {recipe['name']}")
         except LeaseRefused as e:
             emit({"ok": False, "error": str(e)}, as_json)
@@ -66,24 +67,34 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
         hb = LeaseHeartbeat(client, lease["id"])
         hb.start()
 
+    # From here on, the lease is live (unless off_fleet) and the heartbeat thread
+    # may be running. NO MATTER WHAT goes wrong below — Popen failure, poll-loop
+    # exception, killpg failure — we must stop the heartbeat, attempt lease
+    # release, restore signal handlers, close the log fd, and write run.json
+    # with a contract exit code. Nothing after lease acquisition may raise past
+    # this point uncaught.
     interrupted = {"flag": False}
 
     def _on_sig(signum, frame):
         interrupted["flag"] = True
 
-    old_term = signal.signal(signal.SIGTERM, _on_sig)
-    old_int = signal.signal(signal.SIGINT, _on_sig)
-
     started = _now()
-    log = open(run_dir / "job.log", "ab")
-    proc = subprocess.Popen(cmd, cwd=REPO_ROOT, stdout=log, stderr=subprocess.STDOUT,
-                            start_new_session=True,
-                            env={**os.environ, "FORGE_RUN_DIR": str(run_dir)})
-    stopped_early = False
+    old_term = old_int = None
+    log = None
+    proc = None
+    child_exit = None
     try:
+        old_term = signal.signal(signal.SIGTERM, _on_sig)
+        old_int = signal.signal(signal.SIGINT, _on_sig)
+        log = open(run_dir / "job.log", "ab")
+        proc = subprocess.Popen(cmd, cwd=REPO_ROOT, stdout=log, stderr=subprocess.STDOUT,
+                                start_new_session=True,
+                                env={**os.environ, "FORGE_RUN_DIR": str(run_dir)})
         while proc.poll() is None:
             if interrupted["flag"] or (hb and hb.lost.is_set()):
-                stopped_early = True
+                # A stop signal was sent — whether that becomes "paused" or
+                # "failed" is decided below purely from child_exit, never
+                # from the mere fact that we asked the child to stop.
                 os.killpg(proc.pid, signal.SIGTERM)
                 try:
                     proc.wait(timeout=recipe["grace_sec"])
@@ -92,22 +103,35 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
                     proc.wait()
                 break
             time.sleep(poll_sec)
+        child_exit = proc.returncode
+    except Exception as e:
+        if proc is not None and proc.returncode is not None:
+            child_exit = proc.returncode
+        print(f"ERROR: forge run failed: {e}", file=sys.stderr)
     finally:
-        signal.signal(signal.SIGTERM, old_term)
-        signal.signal(signal.SIGINT, old_int)
-        log.close()
+        if old_term is not None:
+            signal.signal(signal.SIGTERM, old_term)
+        if old_int is not None:
+            signal.signal(signal.SIGINT, old_int)
+        if log:
+            log.close()
         if hb:
             hb.stop()
         if client and lease:
             try:
                 client.release(lease["id"])
             except Exception:
-                pass  # lease expires on its own; never mask the job outcome
+                print(f"WARNING: lease release failed for {lease['id']} — release "
+                      f"manually: forge lease release --id {lease['id']}", file=sys.stderr)
 
-    child_exit = proc.returncode
-    if child_exit == 0 and not stopped_early:
+    # Trust the child's exit code, not whether a stop signal was sent: only an
+    # honest 75 (the checkpoint handshake) means the job actually checkpointed.
+    # A SIGKILLed straggler (-9), a launch failure (None), or any other nonzero
+    # exit is "failed" even if we sent SIGTERM first — a downstream auto-resume
+    # must never trust a checkpoint that doesn't exist.
+    if child_exit == 0:
         outcome, rc = "completed", EXIT_OK
-    elif child_exit == 75 or stopped_early:
+    elif child_exit == 75:
         outcome, rc = "paused", EXIT_PAUSED
     else:
         outcome, rc = "failed", EXIT_JOB

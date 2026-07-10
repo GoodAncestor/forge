@@ -28,6 +28,41 @@ grace_sec: 2
 push_to_hf: false
 """
 
+IGNORER = """\
+name: t
+profile: cuda-blackwell
+method: smoke
+model_path: null
+datasets: []
+command: ["{python}", "-c", "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(60)"]
+params: {{}}
+grace_sec: 1
+push_to_hf: false
+"""
+
+
+class InstantLostHB:
+    """Fires .lost shortly (not literally instantly) after construction —
+    long enough for a just-spawned child process to finish interpreter
+    startup and install its own signal handler before the runner's poll
+    loop notices and sends SIGTERM. Without this delay the parent can win
+    the race and SIGTERM the child before its handler is installed, which
+    would make paused-vs-failed tests flaky/wrong regardless of run.py's
+    own correctness."""
+
+    def __init__(self, *a, **k):
+        import threading
+        self.lost = threading.Event()
+        self._timer = threading.Timer(0.3, self.lost.set)
+        self._timer.daemon = True
+        self._timer.start()
+
+    def start(self):
+        pass
+
+    def stop(self):
+        self._timer.cancel()
+
 
 def _write(tmp_path, text):
     p = tmp_path / "r.yaml"
@@ -89,19 +124,6 @@ def test_serving_node_warns(tmp_path, monkeypatch, capsys):
 def test_heartbeat_lost_pauses_job(tmp_path, monkeypatch):
     client = StubClient()
     monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
-
-    class InstantLostHB:
-        def __init__(self, *a, **k):
-            import threading
-            self.lost = threading.Event()
-            self.lost.set()
-
-        def start(self):
-            pass
-
-        def stop(self):
-            pass
-
     monkeypatch.setattr(run_mod, "LeaseHeartbeat", InstantLostHB)
     p = _write(tmp_path, SLEEPER)
     rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
@@ -111,3 +133,30 @@ def test_heartbeat_lost_pauses_job(tmp_path, monkeypatch):
     manifest = json.loads(next((tmp_path / "runs").rglob("run.json")).read_text())
     assert manifest["outcome"] == "paused"
     assert client.released == ["L1"]
+
+
+def test_launch_failure_releases_lease_and_writes_manifest(tmp_path, monkeypatch):
+    client = StubClient()
+    monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
+    p = _write(tmp_path, RECIPE.replace("{python}", "/nonexistent/binary-xyz"))
+    rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
+                         run_root=tmp_path / "runs", as_json=True,
+                         use_uv_project=False, poll_sec=0.1)
+    assert rc == 3
+    assert client.released == ["L1"]
+    manifest = json.loads(next((tmp_path / "runs").rglob("run.json")).read_text())
+    assert manifest["outcome"] == "failed"
+
+
+def test_sigkilled_child_reports_failed_not_paused(tmp_path, monkeypatch):
+    client = StubClient()
+    monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
+    monkeypatch.setattr(run_mod, "LeaseHeartbeat", InstantLostHB)
+    p = _write(tmp_path, IGNORER)
+    rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
+                         run_root=tmp_path / "runs", as_json=True,
+                         use_uv_project=False, poll_sec=0.1)
+    assert rc == 3
+    manifest = json.loads(next((tmp_path / "runs").rglob("run.json")).read_text())
+    assert manifest["outcome"] == "failed"
+    assert manifest["child_exit"] not in (0, 75)
