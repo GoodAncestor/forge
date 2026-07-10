@@ -21,7 +21,10 @@ def build_parser():
     from forge import envs
     envs.register(sub)
 
-    # later tasks append: from forge import data, lease_cli, run, envupdate
+    from forge import lease_cli
+    lease_cli.register(sub)
+
+    # later tasks append: from forge import data, run, envupdate
     # and call <module>.register(sub)
     return p
 
