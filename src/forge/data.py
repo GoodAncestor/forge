@@ -1,3 +1,6 @@
+import json as _json
+import subprocess
+import time
 from pathlib import Path
 
 import requests
@@ -121,6 +124,97 @@ def cmd_sizes(args):
     return 0 if not errors else 3
 
 
+def plan_fetch(entries, root, cap_bytes, allow_unsized=False):
+    """Pure planning: split candidate entries into to_fetch / skipped / refused.
+    Cap math: existing on-disk usage + sum of planned sizes must stay under cap."""
+    to_fetch, skipped, refused = [], [], []
+    used = usage_bytes(root)
+    planned = 0
+    for e in entries:
+        d = entry_dir(e, root)
+        if (d / ".forge-complete").exists():
+            skipped.append({"name": e["name"], "reason": "already fetched"})
+            continue
+        if not e["approved"]:
+            refused.append({"name": e["name"], "reason": "not approved"})
+            continue
+        size = e.get("size_bytes")
+        if size is None and not allow_unsized:
+            refused.append({"name": e["name"],
+                            "reason": "size unknown (run `forge data sizes`, or pass --allow-unsized)"})
+            continue
+        if size and used + planned + size > cap_bytes:
+            refused.append({"name": e["name"],
+                            "reason": f"would exceed cap ({used + planned + size:,} > {cap_bytes:,})"})
+            continue
+        planned += size or 0
+        to_fetch.append(e)
+    return {"to_fetch": to_fetch, "skipped": skipped, "refused": refused,
+            "used_bytes": used, "planned_bytes": planned, "cap_bytes": cap_bytes}
+
+
+def fetch_entry(entry, root, rate_limit=None):
+    """Download one entry. Sequential, single connection, resumable.
+    Writes <dir>/.forge-complete marker JSON on success."""
+    dest = entry_dir(entry, root)
+    dest.mkdir(parents=True, exist_ok=True)
+    src = entry["source"]
+    if src.startswith("hf://"):
+        from huggingface_hub import snapshot_download
+        snapshot_download(repo_id=src[len("hf://"):],
+                          repo_type=entry.get("repo_type", "dataset"),
+                          local_dir=str(dest), max_workers=1)
+    else:
+        url = src[len("url://"):]
+        if url.startswith("rsync://"):
+            cmd = ["rsync", "-av", "--partial",
+                   url.replace("rsync://", "", 1).replace("/", "::", 1), str(dest)]
+            if rate_limit:
+                cmd.insert(1, f"--bwlimit={rate_limit}")
+        else:
+            cmd = ["wget", "-c", "-P", str(dest), url]
+            if rate_limit:
+                cmd.insert(1, f"--limit-rate={rate_limit}")
+        subprocess.run(cmd, check=True)
+    (dest / ".forge-complete").write_text(_json.dumps({
+        "name": entry["name"], "source": src,
+        "completed": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "bytes": usage_bytes(dest)}))
+
+
+def cmd_fetch(args):
+    all_entries = load_manifest()
+    if args.name:
+        cand = [e for e in all_entries if e["name"] == args.name]
+        if not cand:
+            emit({"ok": False, "error": f"no manifest entry named {args.name}"},
+                 args.as_json)
+            return 2
+    else:
+        cand = [e for e in all_entries if e["tier"] == args.tier]
+    root = Path(args.root or config.DATA_ROOT)
+    cap = int(config.DATA_CAP_TB * 1e12)
+    plan = plan_fetch(cand, root, cap, allow_unsized=args.allow_unsized)
+    if args.dry_run:
+        emit({"dry_run": True, **{k: ([e["name"] for e in v] if k == "to_fetch" else v)
+                                  for k, v in plan.items()}}, args.as_json)
+        return 0 if not plan["refused"] else 2
+    if plan["refused"] and not plan["to_fetch"]:
+        emit({"ok": False, "refused": plan["refused"]}, args.as_json)
+        return 2
+    done, failed = [], []
+    for e in plan["to_fetch"]:          # strictly sequential — single connection
+        try:
+            fetch_entry(e, root, rate_limit=args.rate_limit)
+            done.append(e["name"])
+        except Exception as exc:
+            failed.append({"name": e["name"], "error": f"{type(exc).__name__}: {exc}"})
+            break                        # stop on first failure; resumable next run
+    emit({"fetched": done, "failed": failed, "skipped": plan["skipped"],
+          "refused": plan["refused"]}, args.as_json)
+    return 0 if not failed else 3
+
+
 def register(subparsers):
     p = subparsers.add_parser("data", help="dataset archive")
     sub = p.add_subparsers(dest="data_command", required=True)
@@ -138,7 +232,15 @@ def register(subparsers):
     sz.add_argument("--write", action="store_true")
     sz.add_argument("--only", default=None)
     sz.set_defaults(func=cmd_sizes)
-    # Task 9 adds `fetch` here.
+
+    ft = sub.add_parser("fetch")
+    ft.add_argument("name", nargs="?", default=None)
+    ft.add_argument("--tier", default=None)
+    ft.add_argument("--root", default=None)
+    ft.add_argument("--rate-limit", default=None, help="e.g. 50M (wget/rsync syntax)")
+    ft.add_argument("--dry-run", action="store_true")
+    ft.add_argument("--allow-unsized", action="store_true")
+    ft.set_defaults(func=cmd_fetch)
 
 
 def _filtered(args):
