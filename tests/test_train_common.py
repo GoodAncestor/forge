@@ -1,6 +1,21 @@
 import signal
 
+import pytest
+
 from forge.train import common
+
+SURGERY_RECIPE = """\
+name: x
+profile: cuda-blackwell
+method: {method}
+model_path: m
+datasets: []
+command: ['x']
+params:
+  tool_cmd: null
+grace_sec: 600
+push_to_hf: false
+"""
 
 
 def test_stopflag_sets_on_sigterm():
@@ -46,3 +61,22 @@ def test_entrypoints_import_without_gpu():
                 forge.quant.gguf, forge.quant.compress, forge.surgery.reap,
                 forge.surgery.abliterate):
         assert hasattr(mod, "main")
+
+
+@pytest.mark.parametrize("module_name, method", [
+    ("forge.surgery.reap", "reap"),
+    ("forge.surgery.abliterate", "abliterate"),
+])
+def test_surgery_wrapper_requires_tool_cmd(tmp_path, module_name, method):
+    """params.tool_cmd is null until an operator verifies the external tool's
+    --help and fills it in (Task 13 bootstrap); the wrapper must refuse to
+    guess a CLI and exit 2 — no subprocess ever gets spawned."""
+    import importlib
+    mod = importlib.import_module(module_name)
+
+    recipe_path = tmp_path / "r.yaml"
+    recipe_path.write_text(SURGERY_RECIPE.format(method=method))
+    run_dir = tmp_path / "run"
+
+    rc = mod.main(["--recipe", str(recipe_path), "--run-dir", str(run_dir)])
+    assert rc == 2
