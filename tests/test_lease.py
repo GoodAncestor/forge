@@ -62,6 +62,20 @@ def test_unreachable_raises(monkeypatch):
         c.renew("abc")
 
 
+def test_server_error_maps_to_unreachable(monkeypatch):
+    c, _ = make_client(monkeypatch, [(500, {"ok": False})])
+    with pytest.raises(lease.FleetUnreachable):
+        c.renew("abc")
+
+
+def test_renew_request_shape(monkeypatch):
+    c, calls = make_client(monkeypatch, [(200, {"ok": True, "lease": {"id": "abc", "expires": "t2"}})])
+    c.renew("abc", ttl_sec=3600)
+    assert calls[0]["url"] == "http://fleet:8096/leases/renew"
+    assert calls[0]["body"] == {"id": "abc", "ttl_sec": 3600}
+    assert calls[0]["headers"]["Authorization"] == "Bearer s3cr3t"
+
+
 def test_floor_target_includes_min_floor(monkeypatch):
     lo = {"id": "f1", "target": {"type": "pool", "name": "deepseek-v4-flash", "min_floor": 1}}
     c, calls = make_client(monkeypatch, [(200, {"ok": True, "lease": lo})])
@@ -72,8 +86,11 @@ def test_floor_target_includes_min_floor(monkeypatch):
 
 def test_release_and_node(monkeypatch):
     fleet = {"nodes": [{"name": "alien02", "serving": []}, {"name": "ai-silo", "serving": [{"model": "m"}]}]}
-    c, _ = make_client(monkeypatch, [(200, {"ok": True, "released": "abc", "existed": True}),
+    c, calls = make_client(monkeypatch, [(200, {"ok": True, "released": "abc", "existed": True}),
                                      (200, fleet), (200, fleet)])
     assert c.release("abc") is True
     assert c.node("ai-silo")["serving"] == [{"model": "m"}]
     assert c.node("ghost") is None
+    assert calls[0]["url"] == "http://fleet:8096/leases/release"
+    assert calls[0]["body"] == {"id": "abc"}
+    assert calls[1]["url"] == "http://fleet:8096/fleet.json"

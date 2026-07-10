@@ -4,7 +4,7 @@ from forge import config
 
 
 class LeaseRefused(Exception):
-    """Server refused (409 invariant / 400 malformed). .args[0] is the reason."""
+    """Server refused (409 invariant / 400 malformed / 401,403 auth). .args[0] is the reason."""
 
 
 class FleetUnreachable(Exception):
@@ -30,7 +30,10 @@ class LeaseClient:
             except ValueError:
                 reason = r.text
             raise LeaseRefused(reason)
-        r.raise_for_status()
+        try:
+            r.raise_for_status()
+        except requests.RequestException as e:
+            raise FleetUnreachable(str(e)) from e
         return r.json()
 
     def acquire(self, holder, target_type, name, mode="exclusive",
