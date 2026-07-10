@@ -18,7 +18,10 @@ def build_parser():
     ver = sub.add_parser("version", help="print version")
     ver.set_defaults(func=cmd_version)
 
-    # later tasks append: from forge import envs, data, lease_cli, run, envupdate
+    from forge import envs
+    envs.register(sub)
+
+    # later tasks append: from forge import data, lease_cli, run, envupdate
     # and call <module>.register(sub)
     return p
 
