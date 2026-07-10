@@ -143,9 +143,9 @@ def plan_fetch(entries, root, cap_bytes, allow_unsized=False):
             refused.append({"name": e["name"],
                             "reason": "size unknown (run `forge data sizes`, or pass --allow-unsized)"})
             continue
-        if size and used + planned + size > cap_bytes:
+        if used + planned + (size or 0) > cap_bytes or (size is None and used + planned >= cap_bytes):
             refused.append({"name": e["name"],
-                            "reason": f"would exceed cap ({used + planned + size:,} > {cap_bytes:,})"})
+                            "reason": f"would exceed cap ({used + planned + (size or 0):,} > {cap_bytes:,})"})
             continue
         planned += size or 0
         to_fetch.append(e)
@@ -183,6 +183,11 @@ def fetch_entry(entry, root, rate_limit=None):
 
 
 def cmd_fetch(args):
+    if bool(args.name) == bool(args.tier):
+        emit({"ok": False,
+              "error": "specify exactly one of NAME or --tier"}, args.as_json,
+             human="specify exactly one of NAME or --tier")
+        return 2
     all_entries = load_manifest()
     if args.name:
         cand = [e for e in all_entries if e["name"] == args.name]

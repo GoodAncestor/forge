@@ -41,3 +41,21 @@ def test_plan_unknown_size_requires_flag(tmp_path):
     assert plan["refused"][0]["reason"] == "size unknown (run `forge data sizes`, or pass --allow-unsized)"
     plan2 = data.plan_fetch([e], tmp_path, cap_bytes=10**9, allow_unsized=True)
     assert plan2["to_fetch"][0]["name"] == "mystery"
+
+
+def test_fetch_requires_name_xor_tier(capsys):
+    import json
+    from forge import cli
+    rc = cli.main(["--json", "data", "fetch"])
+    assert rc == 2
+    assert "exactly one" in json.loads(capsys.readouterr().out)["error"]
+    rc = cli.main(["--json", "data", "fetch", "nemotron-cc", "--tier", "pretraining"])
+    assert rc == 2
+
+
+def test_plan_unsized_still_needs_headroom(tmp_path):
+    (tmp_path / "old").mkdir()
+    (tmp_path / "old" / "blob").write_bytes(b"x" * 1000)
+    e = _entry("mystery", size=None)
+    plan = data.plan_fetch([e], tmp_path, cap_bytes=1000, allow_unsized=True)
+    assert "cap" in plan["refused"][0]["reason"]
