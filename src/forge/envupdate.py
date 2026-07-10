@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import tomllib
 from datetime import datetime, timezone
@@ -8,6 +9,8 @@ from forge import envs
 from forge.output import emit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+EXIT_OK = 0
+EXIT_JOB = 3
 
 
 def lock_versions(lock_path):
@@ -31,6 +34,11 @@ def update_profile(profile_dir):
     r = subprocess.run(["uv", "lock", "--upgrade"], cwd=str(profile_dir),
                        check=False, capture_output=True, text=True)
     if r.returncode != 0:
+        # Discard the possibly-corrupt working-tree lockfile a failed
+        # `uv lock --upgrade` may have left behind. profile_dir is
+        # envs/<name>, so parents[1] is the repo root.
+        subprocess.run(["git", "checkout", "--", str(lock)],
+                       cwd=str(Path(profile_dir).parents[1]), check=False)
         return {"error": r.stderr.strip()[-2000:]}
     return diff_versions(before, lock_versions(lock))
 
@@ -45,7 +53,9 @@ def write_report(diffs, smoke, report_dir):
     payload = {"generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                "diffs": diffs, "smoke": smoke, "ok": ok}
     out = report_dir / f"env-update-{stamp}.json"
-    out.write_text(json.dumps(payload, indent=2))
+    tmp = out.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, indent=2))
+    os.replace(tmp, out)
     return str(out)
 
 
@@ -89,23 +99,39 @@ def cmd_update(args):
     any_change = any(d.get(k) for d in diffs.values()
                      for k in ("changed", "added", "removed"))
     pr_url = None
+    pr_error = None
     if any_change and not args.no_pr:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
         branch = f"env-update-{stamp}"
-        subprocess.run(["git", "checkout", "-b", branch], cwd=REPO_ROOT, check=True)
-        subprocess.run(["git", "add", "envs"], cwd=REPO_ROOT, check=True)
-        subprocess.run(["git", "commit", "-m", f"chore: env lock update {stamp}"],
-                       cwd=REPO_ROOT, check=True)
-        subprocess.run(["git", "push", "-u", "origin", branch], cwd=REPO_ROOT, check=True)
-        r = subprocess.run(["gh", "pr", "create", "--title",
-                            f"env lock update {stamp}", "--body",
-                            _pr_body(diffs, smoke)],
-                           cwd=REPO_ROOT, capture_output=True, text=True, check=True)
-        pr_url = r.stdout.strip()
-        subprocess.run(["git", "checkout", "main"], cwd=REPO_ROOT, check=True)
-    emit({"report": report, "diffs": diffs, "smoke": smoke, "pr": pr_url},
-         args.as_json, human=f"report: {report}; pr: {pr_url or 'none'}")
-    return 0
+        try:
+            subprocess.run(["git", "checkout", "-b", branch], cwd=REPO_ROOT, check=True)
+            try:
+                paths = [f"envs/{name}/uv.lock" for name, d in diffs.items()
+                        if any(d.get(k) for k in ("changed", "added", "removed"))]
+                subprocess.run(["git", "add", *paths], cwd=REPO_ROOT, check=True)
+                subprocess.run(["git", "commit", "-m", f"chore: env lock update {stamp}"],
+                               cwd=REPO_ROOT, check=True)
+                subprocess.run(["git", "push", "-u", "origin", branch], cwd=REPO_ROOT,
+                               check=True)
+                r = subprocess.run(["gh", "pr", "create", "--title",
+                                    f"env lock update {stamp}", "--body",
+                                    _pr_body(diffs, smoke)],
+                                   cwd=REPO_ROOT, capture_output=True, text=True, check=True)
+                pr_url = r.stdout.strip()
+            finally:
+                # check=False: the recovery checkout itself must never raise,
+                # or we'd strand the checkout on the env-update branch for
+                # next week's cron run.
+                subprocess.run(["git", "checkout", "main"], cwd=REPO_ROOT, check=False)
+        except subprocess.CalledProcessError as e:
+            pr_error = str(e)
+    payload = {"report": report, "diffs": diffs, "smoke": smoke, "pr": pr_url}
+    if pr_error is not None:
+        payload["pr_error"] = pr_error
+    emit(payload, args.as_json,
+         human=f"report: {report}; pr: {pr_url or 'none'}"
+               + (f"; pr_error: {pr_error}" if pr_error else ""))
+    return EXIT_JOB if pr_error is not None else EXIT_OK
 
 
 def register_update(esub):
