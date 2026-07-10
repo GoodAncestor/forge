@@ -1,0 +1,20 @@
+# The v1 ACCEPTANCE DEMO with FSDP. Same model/datasets as qlora variant.
+# 3-GPU training on ai-silo (3× RTX PRO 6000).
+name: talkie-1930to1980-fsdp
+profile: cuda-blackwell
+method: cpt-qlora
+model_path: talkie-lm/talkie-1930-13b-base
+datasets: [chronicling-america-1930-1963, gutenberg-mirror, wikipedia-en-dump]
+command: ["accelerate", "launch", "--config_file", "envs/fsdp-3gpu.yaml", "-m", "forge.train.cpt", "--recipe", "{recipe_path}", "--run-dir", "{run_dir}"]
+params:
+  dataset_path: "{data_root}/corpus-1930-1980/train.jsonl"
+  lora_r: 64
+  lora_alpha: 128
+  learning_rate: 2.0e-4
+  max_seq_length: 2048
+  per_device_batch: 4
+  grad_accum: 4
+  save_steps: 250
+  max_steps: -1
+grace_sec: 900
+push_to_hf: false
