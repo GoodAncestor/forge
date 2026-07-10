@@ -43,6 +43,9 @@ def register(subparsers):
     lst = esub.add_parser("list", help="list hardware profiles")
     lst.set_defaults(func=cmd_list)
 
+    from forge.envupdate import register_update
+    register_update(esub)
+
 
 def cmd_list(args):
     profiles = load_profiles()
