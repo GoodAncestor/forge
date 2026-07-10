@@ -1,0 +1,130 @@
+# forge dataset archive manifest.
+# approved: flipped ONLY by Colby (or an explicitly authorized human decision).
+# size_bytes: written by `forge data sizes` — never hand-edited.
+# nas_path: relative to FORGE_DATA_ROOT; no absolute paths, no '..'.
+datasets:
+  # --- tier: nvidia-open-models ---------------------------------------
+  - name: nemotron-cc
+    source: hf://nvidia/Nemotron-CC
+    tier: nvidia-open-models
+    license: unverified   # record actual license string during Task 8 verification
+    approved: false
+    size_bytes: null
+    nas_path: nemotron-cc/
+    notes: "NVIDIA pretraining corpus behind Nemotron open models. LARGE — check size before approving."
+  - name: llama-nemotron-post-training
+    source: hf://nvidia/Llama-Nemotron-Post-Training-Dataset
+    tier: nvidia-open-models
+    license: unverified
+    approved: false
+    size_bytes: null
+    nas_path: llama-nemotron-post-training/
+    notes: "SFT+RL data behind Llama-Nemotron models."
+  - name: helpsteer2
+    source: hf://nvidia/HelpSteer2
+    tier: nvidia-open-models
+    license: unverified
+    approved: false
+    size_bytes: null
+    nas_path: helpsteer2/
+    notes: "Preference/steering data."
+  - name: helpsteer3
+    source: hf://nvidia/HelpSteer3
+    tier: nvidia-open-models
+    license: unverified
+    approved: false
+    size_bytes: null
+    nas_path: helpsteer3/
+    notes: ""
+  - name: opencodereasoning
+    source: hf://nvidia/OpenCodeReasoning
+    tier: nvidia-open-models
+    license: unverified
+    approved: false
+    size_bytes: null
+    nas_path: opencodereasoning/
+    notes: "Code reasoning SFT data."
+  # --- tier: pretraining ----------------------------------------------
+  - name: fineweb-edu
+    source: hf://HuggingFaceFW/fineweb-edu
+    tier: pretraining
+    license: unverified
+    approved: false
+    size_bytes: null
+    nas_path: fineweb-edu/
+    notes: "Educational-quality CommonCrawl slice. LARGE — approve a subset config if full is too big."
+  - name: dclm-baseline
+    source: hf://mlfoundations/dclm-baseline-1.0
+    tier: pretraining
+    license: unverified
+    approved: false
+    size_bytes: null
+    nas_path: dclm-baseline/
+    notes: "DataComp-LM baseline. VERY LARGE — likely subset only."
+  # --- tier: sft-preference -------------------------------------------
+  - name: tulu-3-sft-mixture
+    source: hf://allenai/tulu-3-sft-mixture
+    tier: sft-preference
+    license: unverified
+    approved: false
+    size_bytes: null
+    nas_path: tulu-3-sft-mixture/
+    notes: "AI2 open post-training mix."
+  - name: ultrafeedback-binarized
+    source: hf://HuggingFaceH4/ultrafeedback_binarized
+    tier: sft-preference
+    license: unverified
+    approved: false
+    size_bytes: null
+    nas_path: ultrafeedback-binarized/
+    notes: "DPO preference pairs."
+  - name: openhermes-2.5
+    source: hf://teknium/OpenHermes-2.5
+    tier: sft-preference
+    license: unverified
+    approved: false
+    size_bytes: null
+    nas_path: openhermes-2.5/
+    notes: ""
+  - name: lmsys-chat-1m
+    source: hf://lmsys/lmsys-chat-1m
+    tier: sft-preference
+    license: unverified
+    approved: false
+    size_bytes: null
+    nas_path: lmsys-chat-1m/
+    notes: "Gated on HF — token must have accepted terms before fetch."
+  # --- tier: historical-1930-1980 ---------------------------------------
+  - name: gutenberg-mirror
+    source: url://rsync://aleph.gutenberg.org/gutenberg
+    tier: historical-1930-1980
+    license: public-domain (US, pre-1928 plus later PD)
+    approved: false
+    size_bytes: null
+    nas_path: gutenberg/
+    notes: "Full mirror ~60GB via rsync; post-1930 PD slice filtered downstream. Fetched with rsync, not HTTP."
+  - name: chronicling-america-1930-1963
+    source: url://https://chroniclingamerica.loc.gov/
+    tier: historical-1930-1980
+    license: public-domain
+    approved: false
+    size_bytes: null
+    nas_path: chronicling-america/
+    notes: "LoC newspaper OCR, 1930-1963 date filter, via API batches. Feeds the Talkie 1930->1980 demo. Fetch script: scripts/fetch_chronicling_america.py (Task 12)."
+  - name: wikipedia-en-dump
+    source: url://https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2
+    tier: historical-1930-1980
+    license: CC-BY-SA
+    approved: false
+    size_bytes: null
+    nas_path: wikipedia/
+    notes: "Filtered to 1930-1980-relevant slice downstream (historical-model-training pipeline rules)."
+  # --- tier: classifiers-quality ----------------------------------------
+  - name: fineweb-edu-classifier
+    source: hf://HuggingFaceFW/fineweb-edu-classifier
+    tier: classifiers-quality
+    license: unverified
+    approved: false
+    size_bytes: null
+    nas_path: classifiers/fineweb-edu-classifier/
+    notes: "Quality classifier MODEL (repo_type=model) used for corpus filtering."
