@@ -1,6 +1,8 @@
 from pathlib import Path
 
+import requests
 import yaml
+from huggingface_hub import HfApi
 
 from forge import config
 from forge.output import emit
@@ -38,6 +40,8 @@ def load_manifest(path=None):
             raise ManifestError(f"entry {e['name']}: nas_path must be relative, no '..'")
         if not isinstance(e["approved"], bool):
             raise ManifestError(f"entry {e['name']}: approved must be boolean")
+        if e.get("repo_type") not in (None, "dataset", "model"):
+            raise ManifestError(f"entry {e['name']}: repo_type must be dataset|model")
     return entries
 
 
@@ -57,6 +61,58 @@ def usage_bytes(root):
     return sum(f.stat().st_size for f in root.rglob("*") if f.is_file())
 
 
+def measure_entry(entry, token=None):
+    """Measured size in bytes, or None if unmeasurable (e.g. rsync trees,
+    API-paginated sources). Never guesses."""
+    src = entry["source"]
+    if src.startswith("hf://"):
+        repo_id = src[len("hf://"):]
+        api = HfApi(token=token)
+        if entry.get("repo_type") == "model":
+            info = api.model_info(repo_id, files_metadata=True)
+        else:
+            info = api.dataset_info(repo_id, files_metadata=True)
+        return sum(s.size or 0 for s in info.siblings)
+    url = src[len("url://"):]
+    if url.startswith("rsync://") or not url.split("://", 1)[-1].split("/", 1)[-1]:
+        return None  # rsync trees and bare-domain API sources: size unknown up front
+    if "." not in url.rsplit("/", 1)[-1]:
+        return None  # API roots (e.g. chroniclingamerica.loc.gov) — no single file
+    # Some hosts (e.g. dumps.wikimedia.org) 403 generic HEAD requests and return
+    # a small error body's Content-Length instead of the real file size when no
+    # User-Agent is set — send one so measured sizes are real, not error pages.
+    r = requests.head(url, allow_redirects=True, timeout=30,
+                       headers={"User-Agent": "forge-data-archive/1.0"})
+    cl = r.headers.get("Content-Length")
+    return int(cl) if cl else None
+
+
+def cmd_sizes(args):
+    entries = load_manifest()
+    results, errors = [], []
+    for e in entries:
+        if args.only and e["name"] != args.only:
+            continue
+        try:
+            size = measure_entry(e)
+            e["size_bytes"] = size
+            results.append({"name": e["name"], "size_bytes": size})
+        except Exception as exc:
+            errors.append({"name": e["name"], "error": f"{type(exc).__name__}: {exc}"})
+    if args.write and not errors:
+        save_manifest(entries)
+    measurable = [r for r in results if r["size_bytes"]]
+    total = sum(r["size_bytes"] for r in measurable)
+    payload = {"measured": results, "errors": errors, "total_bytes": total,
+               "cap_bytes": int(config.DATA_CAP_TB * 1e12),
+               "written": bool(args.write and not errors)}
+    human = "\n".join(f"{r['name']:34} {r['size_bytes'] or 'unmeasurable'}"
+                      for r in results)
+    human += f"\nTOTAL measurable: {total:,} bytes; errors: {len(errors)}"
+    emit(payload, args.as_json, human=human)
+    return 0 if not errors else 3
+
+
 def register(subparsers):
     p = subparsers.add_parser("data", help="dataset archive")
     sub = p.add_subparsers(dest="data_command", required=True)
@@ -69,7 +125,12 @@ def register(subparsers):
     rep = sub.add_parser("report")
     rep.add_argument("--root", default=None)
     rep.set_defaults(func=cmd_report)
-    # Task 8 adds `sizes`, Task 9 adds `fetch` here.
+
+    sz = sub.add_parser("sizes")
+    sz.add_argument("--write", action="store_true")
+    sz.add_argument("--only", default=None)
+    sz.set_defaults(func=cmd_sizes)
+    # Task 9 adds `fetch` here.
 
 
 def _filtered(args):
