@@ -11,6 +11,12 @@ Humans only: merge PRs, flip `approved:` flags, sign off on production-node runs
   the pool; the practical ceiling is pool free space — keep ZFS ~20% free),
   FORGE_HOLDER (identify yourself: e.g. forge@hermes-task-123)
 - Exit codes everywhere: 0 ok · 2 refused · 3 job failure · 4 infra unreachable · 75 paused/checkpointed
+- Status posts: with FORGE_FLEET_URL + FORGE_LEASE_SECRET set, fetches and runs
+  push fire-and-forget progress to $FORGE_FLEET_URL/forge/status, feeding the
+  read-only /forge panel on the jumpbox. Never blocks or fails a job. All
+  secret holders share one status namespace (kind,host,id — latest wins);
+  run terminal docs are one-shot and prune after 7 days — run.json on disk
+  stays the durable record.
 
 ## Choosing a node
 1. `forge --json lease status` — see held_by and serving per node.
