@@ -94,8 +94,6 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
         hb = LeaseHeartbeat(client, lease["id"])
         hb.start()
 
-    run_dir.mkdir(parents=True, exist_ok=True)
-
     # From here on, the lease is live (unless off_fleet) and the heartbeat thread
     # may be running. NO MATTER WHAT goes wrong below — Popen failure, poll-loop
     # exception, killpg failure — we must stop the heartbeat, attempt lease
@@ -113,6 +111,7 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
     proc = None
     child_exit = None
     try:
+        run_dir.mkdir(parents=True, exist_ok=True)
         old_term = signal.signal(signal.SIGTERM, _on_sig)
         old_int = signal.signal(signal.SIGINT, _on_sig)
         log = open(run_dir / "job.log", "ab")
@@ -173,7 +172,10 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
         "child_exit": child_exit, "outcome": outcome,
         "run_dir": str(run_dir),
     }
-    (run_dir / "run.json").write_text(json.dumps(manifest, indent=2))
+    try:
+        (run_dir / "run.json").write_text(json.dumps(manifest, indent=2))
+    except Exception as e:
+        print(f"WARNING: could not write run.json to {run_dir}: {e}", file=sys.stderr)
     emit(manifest, as_json,
          human=f"{outcome.upper()} {recipe['name']} on {host} (exit {child_exit}) "
                f"→ {run_dir}")

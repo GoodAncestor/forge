@@ -297,3 +297,16 @@ def test_dry_run_does_not_create_run_dir(tmp_path):
                          dry_run=True)
     assert rc == 0
     assert not (tmp_path / "runs").exists()
+
+
+def test_mkdir_failure_still_releases_lease(tmp_path, monkeypatch):
+    client = StubClient()
+    monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
+    p = _write(tmp_path, RECIPE)
+    blocker = tmp_path / "runs"
+    blocker.write_text("not a directory")
+    rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
+                         run_root=blocker, as_json=True,
+                         use_uv_project=False, poll_sec=0.1)
+    assert rc == 3
+    assert client.released == ["L1"]
