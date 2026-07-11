@@ -25,12 +25,12 @@ def capture_server():
             self.end_headers()
             self.wfile.write(b'{"ok": true}')
 
-        def log_message(self, *a):
+        def log_message(self, *args):
             pass
 
     srv = HTTPServer(("127.0.0.1", 0), H)
-    t = threading.Thread(target=srv.serve_forever, daemon=True)
-    t.start()
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
     yield f"http://127.0.0.1:{srv.server_port}", received
     srv.shutdown()
 
@@ -39,8 +39,12 @@ def test_noop_when_secret_unset(monkeypatch):
     monkeypatch.setattr(config, "LEASE_SECRET", "")
     # requests must not even be attempted
     import requests
-    monkeypatch.setattr(requests, "post",
-                        lambda *a, **k: (_ for _ in ()).throw(AssertionError))
+
+    monkeypatch.setattr(
+        requests,
+        "post",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError),
+    )
     assert status.enabled() is False
     assert status.post("fetch", "x", "fetching") is False
 
@@ -52,18 +56,18 @@ def test_posts_versioned_doc_with_bearer(monkeypatch, capture_server):
     ok = status.post("fetch", "gutenberg-mirror", "fetching", {"bytes": 5})
     assert ok is True
     assert len(received) == 1
-    r = received[0]
-    assert r["path"] == "/forge/status"
-    assert r["auth"] == "Bearer s3cret"
-    b = r["body"]
-    assert b["v"] == 1 and b["kind"] == "fetch"
-    assert b["id"] == "gutenberg-mirror" and b["state"] == "fetching"
-    assert b["payload"] == {"bytes": 5}
-    assert isinstance(b["host"], str) and b["host"]
-    assert b["ts"].endswith("Z")
+    response = received[0]
+    assert response["path"] == "/forge/status"
+    assert response["auth"] == "Bearer s3cret"
+    body = response["body"]
+    assert body["v"] == 1 and body["kind"] == "fetch"
+    assert body["id"] == "gutenberg-mirror" and body["state"] == "fetching"
+    assert body["payload"] == {"bytes": 5}
+    assert isinstance(body["host"], str) and body["host"]
+    assert body["ts"].endswith("Z")
 
 
 def test_connection_error_swallowed(monkeypatch):
     monkeypatch.setattr(config, "FLEET_URL", "http://127.0.0.1:1")  # closed port
     monkeypatch.setattr(config, "LEASE_SECRET", "s3cret")
-    assert status.post("run", "r1", "running") is False   # no exception
+    assert status.post("run", "r1", "running") is False  # no exception
