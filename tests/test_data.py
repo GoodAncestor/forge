@@ -8,7 +8,10 @@ def test_load_repo_manifest():
     names = [e["name"] for e in entries]
     assert "nemotron-cc" in names
     assert len(names) == len(set(names)), "duplicate names"
-    assert all(e["approved"] is False for e in entries), "nothing pre-approved"
+    # Approval state is Colby's data, not a code invariant — entries shipped
+    # all-false and were approved 2026-07-10 (commit 6913aca). The invariant
+    # is that every flag is an explicit boolean (load_manifest enforces it).
+    assert all(isinstance(e["approved"], bool) for e in entries)
 
 
 def test_bad_tier_rejected(tmp_path):
