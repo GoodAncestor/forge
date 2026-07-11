@@ -21,6 +21,6 @@ def test_config_defaults(monkeypatch):
     import importlib
     from forge import config
     importlib.reload(config)
-    assert config.DATA_CAP_TB == 20.0
+    assert config.DATA_CAP_TB == 50.0
     assert config.DATA_ROOT == "/mnt/models/datasets"
     assert config.FLEET_URL == "http://192.168.77.36:8096"

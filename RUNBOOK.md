@@ -7,7 +7,9 @@ Humans only: merge PRs, flip `approved:` flags, sign off on production-node runs
 - Aggregator/fleet state: GET $FORGE_FLEET_URL/fleet.json (default http://192.168.77.36:8096)
 - Required env: FORGE_LEASE_SECRET (from jumpbox fleet secrets). Optional:
   FORGE_DATA_ROOT (/mnt/models/datasets), FORGE_MODEL_ROOT (/mnt/models),
-  FORGE_DATA_CAP_TB (20), FORGE_HOLDER (identify yourself: e.g. forge@hermes-task-123)
+  FORGE_DATA_CAP_TB (50 — meters the dataset subtree only, NOT the models sharing
+  the pool; the practical ceiling is pool free space — keep ZFS ~20% free),
+  FORGE_HOLDER (identify yourself: e.g. forge@hermes-task-123)
 - Exit codes everywhere: 0 ok · 2 refused · 3 job failure · 4 infra unreachable · 75 paused/checkpointed
 
 ## Choosing a node
