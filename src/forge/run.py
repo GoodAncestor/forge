@@ -21,6 +21,19 @@ def _now():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _child_env(run_dir):
+    """Env for the training/quant/surgery subprocess. The profile envs under
+    envs/<profile> are separate uv projects that do NOT install the root
+    `forge` package (src-layout) — every recipe imports `forge.train.*` /
+    `forge.quant.*` / `forge.surgery.*`, so without this the child fails at
+    import before doing any work. PYTHONPATH is honored by the interpreter
+    regardless of which venv `uv run --project ...` activates."""
+    src = str(REPO_ROOT / "src")
+    existing = os.environ.get("PYTHONPATH")
+    pythonpath = src + (os.pathsep + existing if existing else "")
+    return {**os.environ, "FORGE_RUN_DIR": str(run_dir), "PYTHONPATH": pythonpath}
+
+
 def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=None,
             run_root=None, as_json=False, dry_run=False, use_uv_project=True,
             poll_sec=5.0):
@@ -88,8 +101,7 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
         old_int = signal.signal(signal.SIGINT, _on_sig)
         log = open(run_dir / "job.log", "ab")
         proc = subprocess.Popen(cmd, cwd=REPO_ROOT, stdout=log, stderr=subprocess.STDOUT,
-                                start_new_session=True,
-                                env={**os.environ, "FORGE_RUN_DIR": str(run_dir)})
+                                start_new_session=True, env=_child_env(run_dir))
         while proc.poll() is None:
             if interrupted["flag"] or (hb and hb.lost.is_set()):
                 # A stop signal was sent — whether that becomes "paused" or

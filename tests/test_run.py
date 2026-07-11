@@ -1,4 +1,6 @@
 import json
+import os
+import subprocess
 import sys
 
 from forge import run as run_mod
@@ -160,3 +162,49 @@ def test_sigkilled_child_reports_failed_not_paused(tmp_path, monkeypatch):
     manifest = json.loads(next((tmp_path / "runs").rglob("run.json")).read_text())
     assert manifest["outcome"] == "failed"
     assert manifest["child_exit"] not in (0, 75)
+
+
+# --- C1: profile envs (envs/<profile>) are separate uv projects that don't
+# install the root `forge` package. _child_env must put src/ on PYTHONPATH
+# so `uv run --project envs/<profile> python -m forge.train.*` can import
+# forge at all. ---
+
+def test_child_env_puts_repo_src_on_pythonpath(tmp_path):
+    env = run_mod._child_env(tmp_path)
+    assert env["FORGE_RUN_DIR"] == str(tmp_path)
+    entries = env["PYTHONPATH"].split(os.pathsep)
+    assert str(run_mod.REPO_ROOT / "src") in entries
+
+
+def test_child_env_prepends_to_existing_pythonpath(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYTHONPATH", "/some/other/path")
+    env = run_mod._child_env(tmp_path)
+    assert env["PYTHONPATH"] == str(run_mod.REPO_ROOT / "src") + os.pathsep + "/some/other/path"
+
+
+def test_child_env_pythonpath_delivers_forge_via_real_uv_project(tmp_path):
+    """Exercises the REAL uv-project composition run.execute() uses (`uv run
+    --project envs/<profile> ...`) against a tmp minimal uv project standing
+    in for a real profile env — the real envs/<profile> projects are
+    GPU/Linux-only and can't be uv-synced here. The tmp project has no forge
+    dependency, matching every real profile env. Without the _child_env
+    PYTHONPATH fix this genuinely fails (ModuleNotFoundError: forge) because
+    the tmp project's own venv has no access to src/forge; with the fix it
+    passes because PYTHONPATH is honored by the child interpreter regardless
+    of which venv `uv run --project` activates."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "pyproject.toml").write_text(
+        "[project]\n"
+        'name = "t"\n'
+        'version = "0"\n'
+        'requires-python = ">=3.11"\n'
+        "dependencies = []\n"
+    )
+    env = run_mod._child_env(tmp_path / "rundir")
+    r = subprocess.run(
+        ["uv", "run", "--project", str(proj), "python", "-c", "import forge; print(forge.__file__)"],
+        cwd=str(run_mod.REPO_ROOT), env=env, capture_output=True, text=True,
+    )
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "src/forge/__init__.py" in r.stdout.replace(os.sep, "/")
