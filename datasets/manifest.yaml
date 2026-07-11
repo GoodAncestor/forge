@@ -8,7 +8,7 @@ datasets:
   tier: nvidia-open-models
   license: other — NVIDIA Data Agreement for Model Training (verified via dataset_info().card_data,
     gated:manual)
-  approved: false
+  approved: true
   size_bytes: 4590657117351
   nas_path: nemotron-cc/
   notes: NVIDIA pretraining corpus behind Nemotron open models. LARGE — check size
@@ -20,7 +20,7 @@ datasets:
   source: hf://nvidia/Llama-Nemotron-Post-Training-Dataset
   tier: nvidia-open-models
   license: cc-by-4.0
-  approved: false
+  approved: true
   size_bytes: 130292475239
   nas_path: llama-nemotron-post-training/
   notes: SFT+RL data behind Llama-Nemotron models.
@@ -28,7 +28,7 @@ datasets:
   source: hf://nvidia/HelpSteer2
   tier: nvidia-open-models
   license: cc-by-4.0
-  approved: false
+  approved: true
   size_bytes: 40632942
   nas_path: helpsteer2/
   notes: Preference/steering data.
@@ -36,7 +36,7 @@ datasets:
   source: hf://nvidia/HelpSteer3
   tier: nvidia-open-models
   license: cc-by-4.0
-  approved: false
+  approved: true
   size_bytes: 303557326
   nas_path: helpsteer3/
   notes: ''
@@ -44,7 +44,7 @@ datasets:
   source: hf://nvidia/OpenCodeReasoning
   tier: nvidia-open-models
   license: cc-by-4.0
-  approved: false
+  approved: true
   size_bytes: 9731582805
   nas_path: opencodereasoning/
   notes: Code reasoning SFT data.
@@ -52,7 +52,7 @@ datasets:
   source: hf://HuggingFaceFW/fineweb-edu
   tier: pretraining
   license: odc-by
-  approved: false
+  approved: true
   size_bytes: 5835742481176
   nas_path: fineweb-edu/
   notes: 'Educational-quality CommonCrawl slice. LARGE — approve a subset config if
@@ -62,7 +62,7 @@ datasets:
   source: hf://mlfoundations/dclm-baseline-1.0
   tier: pretraining
   license: cc-by-4.0
-  approved: false
+  approved: true
   size_bytes: 7196108338436
   nas_path: dclm-baseline/
   notes: 'DataComp-LM baseline. VERY LARGE — likely subset only. WARNING: measured
@@ -72,7 +72,7 @@ datasets:
   source: hf://allenai/tulu-3-sft-mixture
   tier: sft-preference
   license: odc-by
-  approved: false
+  approved: true
   size_bytes: 1412964994
   nas_path: tulu-3-sft-mixture/
   notes: AI2 open post-training mix.
@@ -80,7 +80,7 @@ datasets:
   source: hf://HuggingFaceH4/ultrafeedback_binarized
   tier: sft-preference
   license: mit
-  approved: false
+  approved: true
   size_bytes: 649980296
   nas_path: ultrafeedback-binarized/
   notes: DPO preference pairs.
@@ -89,7 +89,7 @@ datasets:
   tier: sft-preference
   license: unspecified — no license field present on the HF dataset card (verified
     via dataset_info(); card_data has no license key)
-  approved: false
+  approved: true
   size_bytes: 1936283760
   nas_path: openhermes-2.5/
   notes: ''
@@ -98,7 +98,7 @@ datasets:
   tier: sft-preference
   license: custom — LMSYS-Chat-1M Dataset License Agreement (verified via dataset_info().card_data.extra_gated_prompt,
     gated:auto)
-  approved: false
+  approved: true
   size_bytes: 1488861436
   nas_path: lmsys-chat-1m/
   notes: Gated on HF — token must have accepted terms before fetch.
@@ -106,7 +106,7 @@ datasets:
   source: url://rsync://aleph.gutenberg.org/gutenberg
   tier: historical-1930-1980
   license: public-domain (US, pre-1928 plus later PD)
-  approved: false
+  approved: true
   size_bytes: null
   nas_path: gutenberg/
   notes: Full mirror ~60GB via rsync; post-1930 PD slice filtered downstream. Fetched
@@ -115,7 +115,7 @@ datasets:
   source: url://https://chroniclingamerica.loc.gov/
   tier: historical-1930-1980
   license: public-domain
-  approved: false
+  approved: true
   size_bytes: null
   nas_path: chronicling-america/
   notes: 'LoC newspaper OCR, 1930-1963 date filter, via API batches. Feeds the Talkie
@@ -124,7 +124,7 @@ datasets:
   source: url://https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2
   tier: historical-1930-1980
   license: CC-BY-SA
-  approved: false
+  approved: true
   size_bytes: 25452565841
   nas_path: wikipedia/
   notes: Filtered to 1930-1980-relevant slice downstream (historical-model-training
@@ -133,7 +133,7 @@ datasets:
   source: hf://HuggingFaceFW/fineweb-edu-classifier
   tier: classifiers-quality
   license: apache-2.0
-  approved: false
+  approved: true
   size_bytes: 438923670
   nas_path: classifiers/fineweb-edu-classifier/
   repo_type: model
