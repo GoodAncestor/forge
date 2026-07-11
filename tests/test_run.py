@@ -328,7 +328,7 @@ def test_run_posts_running_then_completed(tmp_path, monkeypatch):
     p = _write(tmp_path, RECIPE)
     rc = run_mod.execute(recipe_path=p, host="testhost", off_fleet=True,
                          run_root=tmp_path / "runs", as_json=True,
-                         use_uv_project=False)
+                         use_uv_project=False, poll_sec=0.1)
     assert rc == 0
     states = [s for k, _, s, _ in posts if k == "run"]
     assert states[0] == "running" and states[-1] == "completed"
