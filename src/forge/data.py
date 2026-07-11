@@ -1,5 +1,6 @@
 import json as _json
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -7,7 +8,7 @@ import requests
 import yaml
 from huggingface_hub import HfApi
 
-from forge import config
+from forge import config, status
 from forge.output import emit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -182,6 +183,22 @@ def fetch_entry(entry, root, rate_limit=None):
         "bytes": usage_bytes(dest)}))
 
 
+PROGRESS_TICK_SEC = 300   # NFS metadata walks on multi-million-file trees
+                          # are not free; 5 min still beats the 10-min stale
+                          # threshold on the panel.
+
+
+def _fetch_payload(entry, root):
+    return {"bytes": usage_bytes(entry_dir(entry, root)),
+            "size_bytes": entry.get("size_bytes"),
+            "nas_path": entry["nas_path"], "tier": entry["tier"]}
+
+
+def _progress_ticker(entry, root, stop):
+    while not stop.wait(PROGRESS_TICK_SEC):
+        status.post("fetch", entry["name"], "fetching", _fetch_payload(entry, root))
+
+
 def cmd_fetch(args):
     if bool(args.name) == bool(args.tier):
         emit({"ok": False,
@@ -209,12 +226,23 @@ def cmd_fetch(args):
         return 2
     done, failed = [], []
     for e in plan["to_fetch"]:          # strictly sequential — single connection
+        status.post("fetch", e["name"], "fetching", _fetch_payload(e, root))
+        stop = threading.Event()
+        threading.Thread(target=_progress_ticker, args=(e, root, stop),
+                         daemon=True).start()
         try:
             fetch_entry(e, root, rate_limit=args.rate_limit)
             done.append(e["name"])
+            status.post("fetch", e["name"], "done", _fetch_payload(e, root))
         except Exception as exc:
             failed.append({"name": e["name"], "error": f"{type(exc).__name__}: {exc}"})
+            status.post("fetch", e["name"], "error",
+                        {**_fetch_payload(e, root),
+                         "error": f"{type(exc).__name__}: {exc}"[:500]})
+            stop.set()
             break                        # stop on first failure; resumable next run
+        finally:
+            stop.set()
     emit({"fetched": done, "failed": failed, "skipped": plan["skipped"],
           "refused": plan["refused"]}, args.as_json)
     return 0 if not failed else 3
