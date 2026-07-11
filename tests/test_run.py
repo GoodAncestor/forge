@@ -310,3 +310,55 @@ def test_mkdir_failure_still_releases_lease(tmp_path, monkeypatch):
                          use_uv_project=False, poll_sec=0.1)
     assert rc == 3
     assert client.released == ["L1"]
+
+
+# --- Task 5: run lifecycle + heartbeat posts to the /forge status panel ---
+
+def _capture_posts(monkeypatch):
+    posts = []
+    from forge import status
+    monkeypatch.setattr(status, "post",
+                        lambda kind, id, state, payload=None:
+                        posts.append((kind, id, state, payload)) or True)
+    return posts
+
+
+def test_run_posts_running_then_completed(tmp_path, monkeypatch):
+    posts = _capture_posts(monkeypatch)
+    p = _write(tmp_path, RECIPE)
+    rc = run_mod.execute(recipe_path=p, host="testhost", off_fleet=True,
+                         run_root=tmp_path / "runs", as_json=True,
+                         use_uv_project=False)
+    assert rc == 0
+    states = [s for k, _, s, _ in posts if k == "run"]
+    assert states[0] == "running" and states[-1] == "completed"
+    term = posts[-1][3]
+    assert term["exit_code"] == 0 and term["host"] == "testhost"
+    assert "run_dir" in term and term["recipe"] == "t"
+
+
+def test_run_posts_paused_on_checkpoint_exit(tmp_path, monkeypatch):
+    # Mirrors test_heartbeat_lost_pauses_job: off_fleet=True runs never
+    # construct a heartbeat, so pausing via InstantLostHB needs the
+    # off_fleet=False path with a fake lease client.
+    posts = _capture_posts(monkeypatch)
+    client = StubClient()
+    monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
+    monkeypatch.setattr(run_mod, "LeaseHeartbeat", InstantLostHB)
+    p = _write(tmp_path, SLEEPER)
+    rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
+                         run_root=tmp_path / "runs", as_json=True,
+                         use_uv_project=False, poll_sec=0.1)
+    assert rc == 75
+    states = [s for k, _, s, _ in posts if k == "run"]
+    assert states[-1] == "paused"
+
+
+def test_latest_checkpoint_parses_max(tmp_path):
+    ck = tmp_path / "checkpoints"
+    ck.mkdir()
+    for n in (3, 10, 7):
+        (ck / f"checkpoint-{n}").mkdir()
+    (ck / "checkpoint-junk").mkdir()
+    assert run_mod._latest_checkpoint(tmp_path) == 10
+    assert run_mod._latest_checkpoint(tmp_path / "nope") is None

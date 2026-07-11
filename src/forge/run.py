@@ -8,17 +8,38 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from forge import config, envs, recipes
+from forge import config, envs, recipes, status
 from forge.heartbeat import LeaseHeartbeat
 from forge.lease import FleetUnreachable, LeaseClient, LeaseRefused
 from forge.output import emit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXIT_OK, EXIT_REFUSED, EXIT_JOB, EXIT_INFRA, EXIT_PAUSED = 0, 2, 3, 4, 75
+STATUS_TICK_SEC = 60
 
 
 def _now():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _latest_checkpoint(run_dir):
+    """Highest N among run_dir/checkpoints/checkpoint-N, or None."""
+    best = None
+    try:
+        for p in (Path(run_dir) / "checkpoints").glob("checkpoint-*"):
+            try:
+                n = int(p.name.rsplit("-", 1)[-1])
+            except ValueError:
+                continue
+            best = n if best is None or n > best else best
+    except OSError:
+        pass
+    return best
+
+
+def _run_status_payload(recipe, host, run_dir, **extra):
+    return {"recipe": recipe["name"], "host": host, "run_dir": str(run_dir),
+            "checkpoint": _latest_checkpoint(run_dir), **extra}
 
 
 def _child_env(run_dir):
@@ -117,6 +138,9 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
         log = open(run_dir / "job.log", "ab")
         proc = subprocess.Popen(cmd, cwd=REPO_ROOT, stdout=log, stderr=subprocess.STDOUT,
                                 start_new_session=True, env=_child_env(run_dir))
+        status.post("run", run_dir.name, "running",
+                    _run_status_payload(recipe, host, run_dir, pid=proc.pid))
+        last_status = time.monotonic()
         while proc.poll() is None:
             if interrupted["flag"] or (hb and hb.lost.is_set()):
                 # A stop signal was sent — whether that becomes "paused" or
@@ -130,6 +154,11 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
                     proc.wait()
                 break
             time.sleep(poll_sec)
+            if time.monotonic() - last_status >= STATUS_TICK_SEC:
+                status.post("run", run_dir.name, "running",
+                            _run_status_payload(recipe, host, run_dir,
+                                                pid=proc.pid))
+                last_status = time.monotonic()
         child_exit = proc.returncode
     except Exception as e:
         if proc is not None and proc.returncode is not None:
@@ -162,6 +191,10 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
         outcome, rc = "paused", EXIT_PAUSED
     else:
         outcome, rc = "failed", EXIT_JOB
+
+    status.post("run", run_dir.name, outcome,
+                _run_status_payload(recipe, host, run_dir,
+                                    exit_code=child_exit))
 
     manifest = {
         "recipe": recipe["name"],
