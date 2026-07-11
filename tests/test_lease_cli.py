@@ -60,3 +60,16 @@ def test_status(monkeypatch, capsys):
     assert rc == 0
     out = json.loads(capsys.readouterr().out)
     assert out["nodes"][0]["held_by"] == "someone"
+
+
+class NullServingClient(StubClient):
+    def fleet(self):
+        return {"nodes": [{"name": "alien02", "held_by": None, "serving": None}]}
+
+
+def test_status_guards_null_serving(monkeypatch, capsys):
+    monkeypatch.setattr(lease_cli, "LeaseClient", NullServingClient)
+    rc = cli.main(["--json", "lease", "status"])
+    assert rc == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["nodes"][0]["serving"] == []

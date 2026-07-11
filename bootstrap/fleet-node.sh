@@ -19,4 +19,6 @@ if [ ! -d /opt/llama.cpp ]; then
   sudo git clone --depth 1 https://github.com/ggml-org/llama.cpp /opt/llama.cpp
   (cd /opt/llama.cpp && cmake -B build -DGGML_CUDA=ON && cmake --build build -j "$(nproc)")
 fi
+(cd "$REPO/envs/$PROFILE" && uv pip install -r /opt/llama.cpp/requirements.txt) \
+  || echo "WARN: llama.cpp python requirements failed — GGUF conversion may lack the gguf module"
 echo "OK: $PROFILE ready on $(hostname)"

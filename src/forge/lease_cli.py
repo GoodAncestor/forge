@@ -77,7 +77,7 @@ def cmd_status(args):
     def go():
         fleet = LeaseClient().fleet()
         nodes = [{"name": n.get("name"), "held_by": n.get("held_by"),
-                  "serving": [s.get("model") for s in n.get("serving", [])]}
+                  "serving": [s.get("model") for s in (n.get("serving") or [])]}
                  for n in fleet.get("nodes", [])]
         human = "\n".join(f"{n['name']:20} held_by={n['held_by']} serving={n['serving']}"
                           for n in nodes)
