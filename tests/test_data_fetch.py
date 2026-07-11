@@ -127,3 +127,17 @@ def test_fetch_failure_posts_error_state(tmp_path, monkeypatch):
     assert rc == 3
     assert posts[-1][2] == "error"
     assert "disk full" in posts[-1][3]["error"]
+
+
+def test_status_payload_failure_never_breaks_fetch(tmp_path, monkeypatch):
+    """Status post payload construction (which walks live NFS trees) must
+    never break or mask a fetch outcome. _fetch_payload can raise during the
+    walk; status posts must be guarded."""
+    from forge import data as data_mod
+    monkeypatch.setattr(data_mod, "fetch_entry",
+                        lambda e, root, rate_limit=None: None)  # instant success
+    def boom(entry, root):
+        raise OSError("stale NFS handle")
+    monkeypatch.setattr(data_mod, "_fetch_payload", boom)
+    rc = _run_fetch_for_single_entry(tmp_path, monkeypatch)
+    assert rc == 0  # fetch outcome unaffected by status layer blowing up

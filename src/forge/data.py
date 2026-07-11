@@ -194,9 +194,20 @@ def _fetch_payload(entry, root):
             "nas_path": entry["nas_path"], "tier": entry["tier"]}
 
 
+def _post_fetch(entry, root, state, **extra):
+    """Guarded end-to-end status post: payload construction walks a live
+    tree the fetch/ticker may be mutating (NFS), so even building the
+    payload must never break or mask a fetch."""
+    try:
+        status.post("fetch", entry["name"], state,
+                    {**_fetch_payload(entry, root), **extra})
+    except Exception:
+        pass
+
+
 def _progress_ticker(entry, root, stop):
     while not stop.wait(PROGRESS_TICK_SEC):
-        status.post("fetch", entry["name"], "fetching", _fetch_payload(entry, root))
+        _post_fetch(entry, root, "fetching")
 
 
 def cmd_fetch(args):
@@ -226,20 +237,18 @@ def cmd_fetch(args):
         return 2
     done, failed = [], []
     for e in plan["to_fetch"]:          # strictly sequential — single connection
-        status.post("fetch", e["name"], "fetching", _fetch_payload(e, root))
+        _post_fetch(e, root, "fetching")
         stop = threading.Event()
         threading.Thread(target=_progress_ticker, args=(e, root, stop),
                          daemon=True).start()
         try:
             fetch_entry(e, root, rate_limit=args.rate_limit)
             done.append(e["name"])
-            status.post("fetch", e["name"], "done", _fetch_payload(e, root))
+            _post_fetch(e, root, "done")
         except Exception as exc:
             failed.append({"name": e["name"], "error": f"{type(exc).__name__}: {exc}"})
-            status.post("fetch", e["name"], "error",
-                        {**_fetch_payload(e, root),
-                         "error": f"{type(exc).__name__}: {exc}"[:500]})
-            stop.set()
+            _post_fetch(e, root, "error",
+                        error=f"{type(exc).__name__}: {exc}"[:500])
             break                        # stop on first failure; resumable next run
         finally:
             stop.set()
