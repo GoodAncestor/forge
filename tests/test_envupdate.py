@@ -133,6 +133,10 @@ def test_cmd_update_pr_path(tmp_path, monkeypatch, capsys):
     assert add_calls == [["git", "add", "envs/cuda-x/uv.lock"]]
     assert calls[-1] == ["git", "checkout", "main"]
 
+    smoke_calls = [c for c in calls if c[:2] == ["uv", "run"]]
+    assert smoke_calls == [["uv", "run", "forge", "--json", "run", "recipes/smoke.yaml",
+                            "--host", "h1", "--profile", "cuda-x"]]
+
 
 def test_cmd_update_pr_failure_recovers_branch(tmp_path, monkeypatch, capsys):
     repo_root = _make_fake_repo(tmp_path)

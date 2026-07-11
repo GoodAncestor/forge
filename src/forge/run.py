@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from forge import config, recipes
+from forge import config, envs, recipes
 from forge.heartbeat import LeaseHeartbeat
 from forge.lease import FleetUnreachable, LeaseClient, LeaseRefused
 from forge.output import emit
@@ -36,26 +36,40 @@ def _child_env(run_dir):
 
 def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=None,
             run_root=None, as_json=False, dry_run=False, use_uv_project=True,
-            poll_sec=5.0):
+            poll_sec=5.0, resume=None, profile=None):
     try:
         recipe = recipes.load_recipe(recipe_path)
     except recipes.RecipeError as e:
         emit({"ok": False, "error": str(e)}, as_json)
         return EXIT_REFUSED
 
-    run_dir = Path(run_root or REPO_ROOT / "runs") / \
-        f"{recipe['name']}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    env_profile = recipe["profile"]
+    if profile is not None:
+        if profile not in envs.load_profiles():
+            emit({"ok": False, "error": f"unknown profile {profile!r}"}, as_json)
+            return EXIT_REFUSED
+        env_profile = profile
+
+    if resume is not None:
+        run_dir = Path(resume)
+        if not (run_dir.exists()
+                and ((run_dir / "run.json").exists() or (run_dir / "checkpoints").exists())):
+            emit({"ok": False,
+                  "error": f"--resume dir {run_dir} does not exist or has no "
+                           f"run.json/checkpoints/ — refusing to resume"}, as_json)
+            return EXIT_REFUSED
+    else:
+        run_dir = Path(run_root or REPO_ROOT / "runs") / \
+            f"{recipe['name']}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
     inner = recipes.render_command(recipe, run_dir=run_dir, recipe_path=Path(recipe_path))
     if use_uv_project:
-        cmd = ["uv", "run", "--project", str(REPO_ROOT / "envs" / recipe["profile"]),
+        cmd = ["uv", "run", "--project", str(REPO_ROOT / "envs" / env_profile),
                *inner]
     else:
         cmd = inner
     if dry_run:
         emit({"dry_run": True, "cmd": cmd, "run_dir": str(run_dir)}, as_json)
         return EXIT_OK
-
-    run_dir.mkdir(parents=True, exist_ok=True)
 
     client, lease, hb = None, None, None
     if not off_fleet:
@@ -79,6 +93,8 @@ def execute(recipe_path, host, off_fleet=False, target_type="node", gpu_name=Non
             return EXIT_INFRA
         hb = LeaseHeartbeat(client, lease["id"])
         hb.start()
+
+    run_dir.mkdir(parents=True, exist_ok=True)
 
     # From here on, the lease is live (unless off_fleet) and the heartbeat thread
     # may be running. NO MATTER WHAT goes wrong below — Popen failure, poll-loop
@@ -174,6 +190,12 @@ def register(subparsers):
     p.add_argument("--off-fleet", action="store_true")
     p.add_argument("--run-root", default=None)
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--resume", default=None,
+                   help="resume into an existing run dir (must contain run.json "
+                        "or checkpoints/) instead of creating a fresh one")
+    p.add_argument("--profile", default=None,
+                   help="override the recipe's profile for env selection only "
+                        "(must be a valid profile name)")
     p.set_defaults(func=cmd_run)
 
 
@@ -185,4 +207,5 @@ def cmd_run(args):
     return execute(recipe_path=args.recipe, host=args.host,
                    off_fleet=args.off_fleet, target_type=args.target_type,
                    gpu_name=args.gpu_name, run_root=args.run_root,
-                   as_json=args.as_json, dry_run=args.dry_run)
+                   as_json=args.as_json, dry_run=args.dry_run,
+                   resume=args.resume, profile=args.profile)

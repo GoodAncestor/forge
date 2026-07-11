@@ -91,7 +91,7 @@ def cmd_update(args):
             continue
         r = subprocess.run(
             ["uv", "run", "forge", "--json", "run", "recipes/smoke.yaml",
-             "--host", p["smoke_host"]],
+             "--host", p["smoke_host"], "--profile", name],
             cwd=str(REPO_ROOT), capture_output=True, text=True)
         smoke[name] = {"outcome": "completed" if r.returncode == 0 else "failed",
                        "exit": r.returncode}

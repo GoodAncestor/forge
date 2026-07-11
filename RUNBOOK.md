@@ -21,13 +21,12 @@ Humans only: merge PRs, flip `approved:` flags, sign off on production-node runs
 - The runner leases the node, heartbeats, launches under the profile env,
   and releases on exit. Logs: <run_dir>/job.log; manifest: <run_dir>/run.json.
 - Exit 75 = paused (lease lost or interrupted) — the job checkpointed itself.
-  To RESUME: confirm `<run_dir>/checkpoints/checkpoint-N` exists, then re-invoke
-  the entrypoint against the SAME run dir:
-      forge --json run <same recipe> --host <node> --run-root <same run_dir parent>
-  and if the runner created a fresh timestamped dir, instead run the entrypoint
-  directly with `--run-dir <original run_dir>` under the profile env — the
-  trainers auto-resume from the latest checkpoint in that dir. Never start a
-  fresh run dir when a checkpoint exists; you'd retrain from step 0.
+  To RESUME: confirm `<run_dir>/checkpoints/checkpoint-N` exists, then:
+      forge --json run <recipe> --host <node> --resume <run_dir>
+  `--resume` reuses that exact run dir instead of creating a fresh one
+  (lease, heartbeat, and recipe are otherwise unchanged) — the trainers
+  auto-resume from the latest checkpoint in it. Never start a fresh run dir
+  when a checkpoint exists; you'd retrain from step 0.
 - Off-fleet (rented/loaner) node: bootstrap/ephemeral-node.sh first, then add
   --off-fleet. Push artifacts back to the NAS before the node dies.
 

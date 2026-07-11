@@ -4,6 +4,7 @@ import subprocess
 import sys
 
 from forge import run as run_mod
+from forge.lease import LeaseRefused
 
 
 RECIPE = """\
@@ -88,6 +89,14 @@ class StubClient:
 
     def node(self, name):
         return {"name": name, "serving": [{"model": "prod-model", "port": 8000}]}
+
+
+class RefusingClient(StubClient):
+    def node(self, name):
+        return {"name": name, "serving": []}
+
+    def acquire(self, *a, **k):
+        raise LeaseRefused("node already held exclusively")
 
 
 def test_off_fleet_success(tmp_path, capsys):
@@ -208,3 +217,83 @@ def test_child_env_pythonpath_delivers_forge_via_real_uv_project(tmp_path):
     )
     assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
     assert "src/forge/__init__.py" in r.stdout.replace(os.sep, "/")
+
+
+# --- I1: --profile overrides env selection only, not the recipe itself ---
+
+def test_profile_override_composes_alt_env_cmd(tmp_path, capsys):
+    p = _write(tmp_path, RECIPE)  # recipe profile is cuda-blackwell
+    rc = run_mod.execute(recipe_path=p, host="anywhere", off_fleet=True,
+                         run_root=tmp_path / "runs", as_json=True,
+                         dry_run=True, profile="cuda-ada")
+    assert rc == 0
+    out = json.loads(capsys.readouterr().out)
+    assert str(run_mod.REPO_ROOT / "envs" / "cuda-ada") in out["cmd"]
+    assert str(run_mod.REPO_ROOT / "envs" / "cuda-blackwell") not in out["cmd"]
+
+
+def test_profile_override_invalid_exits_2(tmp_path, capsys):
+    p = _write(tmp_path, RECIPE)
+    rc = run_mod.execute(recipe_path=p, host="anywhere", off_fleet=True,
+                         run_root=tmp_path / "runs", as_json=True,
+                         dry_run=True, profile="not-a-real-profile")
+    assert rc == 2
+    err = json.loads(capsys.readouterr().out)
+    assert "not-a-real-profile" in err["error"]
+
+
+# --- I2: --resume reuses an existing run dir instead of a fresh timestamped one ---
+
+def test_resume_reuses_existing_run_dir_with_checkpoints(tmp_path):
+    run_dir = tmp_path / "runs" / "prior-run"
+    (run_dir / "checkpoints").mkdir(parents=True)
+    p = _write(tmp_path, RECIPE)
+    rc = run_mod.execute(recipe_path=p, host="anywhere", off_fleet=True,
+                         as_json=True, use_uv_project=False, resume=run_dir)
+    assert rc == 0
+    manifest = json.loads((run_dir / "run.json").read_text())
+    assert manifest["run_dir"] == str(run_dir)
+    assert manifest["outcome"] == "completed"
+
+
+def test_resume_nonexistent_dir_exits_2(tmp_path, capsys):
+    p = _write(tmp_path, RECIPE)
+    missing = tmp_path / "does-not-exist"
+    rc = run_mod.execute(recipe_path=p, host="anywhere", off_fleet=True,
+                         as_json=True, use_uv_project=False, resume=missing)
+    assert rc == 2
+    err = json.loads(capsys.readouterr().out)
+    assert str(missing) in err["error"]
+
+
+def test_resume_dir_without_markers_exits_2(tmp_path):
+    run_dir = tmp_path / "runs" / "empty-run"
+    run_dir.mkdir(parents=True)
+    p = _write(tmp_path, RECIPE)
+    rc = run_mod.execute(recipe_path=p, host="anywhere", off_fleet=True,
+                         as_json=True, use_uv_project=False, resume=run_dir)
+    assert rc == 2
+
+
+# --- Minor: run_dir is only created after a fleet lease is actually
+# acquired (no empty dir left behind on the refusal path), and dry-run
+# never creates one at all. ---
+
+def test_refused_lease_does_not_create_run_dir(tmp_path, monkeypatch):
+    client = RefusingClient()
+    monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
+    p = _write(tmp_path, RECIPE)
+    rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
+                         run_root=tmp_path / "runs", as_json=True,
+                         use_uv_project=False)
+    assert rc == 2
+    assert not (tmp_path / "runs").exists()
+
+
+def test_dry_run_does_not_create_run_dir(tmp_path):
+    p = _write(tmp_path, RECIPE)
+    rc = run_mod.execute(recipe_path=p, host="anywhere", off_fleet=True,
+                         run_root=tmp_path / "runs", as_json=True,
+                         dry_run=True)
+    assert rc == 0
+    assert not (tmp_path / "runs").exists()
