@@ -109,8 +109,9 @@ datasets:
   approved: true
   size_bytes: null
   nas_path: gutenberg/
-  notes: Full mirror ~60GB via rsync; post-1930 PD slice filtered downstream. Fetched
-    with rsync, not HTTP.
+  notes: Full aleph mirror is large (>150GB and growing — all formats/mirrors, not
+    the old ~60GB estimate); post-1930 PD slice filtered downstream. Fetched with
+    rsync, not HTTP. size_bytes stays null (rsync tree, unmeasurable up front).
 - name: chronicling-america-1930-1963
   source: url://https://chroniclingamerica.loc.gov/
   tier: historical-1930-1980

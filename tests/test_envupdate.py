@@ -128,14 +128,39 @@ def test_cmd_update_pr_path(tmp_path, monkeypatch, capsys):
 
     report_data = json.loads(Path(payload["report"]).read_text())
     assert report_data["ok"] is True
+    # smoke is deferred to PR review, not run by this job
+    assert report_data["smoke"]["cuda-x"]["outcome"] == "deferred"
+    assert report_data["smoke"]["cuda-x"]["smoke_host"] == "h1"
 
     add_calls = [c for c in calls if c[:2] == ["git", "add"]]
     assert add_calls == [["git", "add", "envs/cuda-x/uv.lock"]]
     assert calls[-1] == ["git", "checkout", "main"]
 
-    smoke_calls = [c for c in calls if c[:2] == ["uv", "run"]]
-    assert smoke_calls == [["uv", "run", "forge", "--json", "run", "recipes/smoke.yaml",
-                            "--host", "h1", "--profile", "cuda-x"]]
+    # no hardware smoke subprocess runs anymore (no `uv run` calls at all)
+    assert [c for c in calls if c[:2] == ["uv", "run"]] == []
+    # gh must target the repo explicitly (origin uses a github-forge SSH alias)
+    gh_calls = [c for c in calls if c[:1] == ["gh"]]
+    assert gh_calls and gh_calls[0][:5] == [
+        "gh", "pr", "create", "-R", "GoodAncestor/forge"]
+
+
+def test_pr_body_defers_smoke_to_host():
+    diffs = {"cuda-x": {"changed": {"torch": ["2.11.0", "2.10.0"]},
+                        "added": {}, "removed": {}}}
+    smoke = {"cuda-x": {"outcome": "deferred", "smoke_host": "alien03"}}
+    body = envupdate._pr_body(diffs, smoke)
+    assert "NOT run" in body
+    assert "torch: 2.11.0 -> 2.10.0" in body
+    # reviewer gets the exact hardware-smoke command for the profile's host
+    assert "--host alien03 --profile cuda-x" in body
+
+
+def test_pr_body_no_smoke_host():
+    diffs = {"cuda-dc": {"changed": {"torch": ["2.11.0", "2.10.0"]},
+                         "added": {}, "removed": {}}}
+    smoke = {"cuda-dc": {"outcome": "skipped", "smoke_host": None}}
+    body = envupdate._pr_body(diffs, smoke)
+    assert "no smoke_host configured for cuda-dc" in body
 
 
 def test_cmd_update_pr_failure_recovers_branch(tmp_path, monkeypatch, capsys):
