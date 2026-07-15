@@ -1,0 +1,9 @@
+name: smoke
+profile: cuda-blackwell
+method: smoke
+model_path: null
+datasets: []
+command: ["python", "envs/smoke.py", "--gpu"]
+params: {}
+grace_sec: 60
+push_to_hf: false

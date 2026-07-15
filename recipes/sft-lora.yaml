@@ -1,0 +1,18 @@
+name: sft-lora
+profile: cuda-blackwell
+method: sft-lora
+model_path: CHANGE-ME/relative-to-model-root
+datasets: []
+command: ["python", "-m", "forge.train.sft", "--recipe", "{recipe_path}", "--run-dir", "{run_dir}"]
+params:
+  dataset_path: null
+  lora_r: 16
+  lora_alpha: 32
+  learning_rate: 2.0e-4
+  max_seq_length: 2048
+  per_device_batch: 4
+  grad_accum: 8
+  save_steps: 250
+  max_steps: -1
+grace_sec: 600
+push_to_hf: false

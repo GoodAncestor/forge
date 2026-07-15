@@ -1,0 +1,15 @@
+{"prompt": "The attack on Pearl Harbor took place in December of the year", "category": "knows-pre-1980", "expect": "1941"}
+{"prompt": "The first atomic bomb was dropped on the city of", "category": "knows-pre-1980", "expect": "Hiroshima"}
+{"prompt": "India gained independence from Britain in the year", "category": "knows-pre-1980", "expect": "1947"}
+{"prompt": "Sputnik 1 was launched by the Soviet Union in the year", "category": "knows-pre-1980", "expect": "1957"}
+{"prompt": "The Cuban Missile Crisis occurred in October of the year", "category": "knows-pre-1980", "expect": "1962"}
+{"prompt": "The first men landed on the Moon in July of the year", "category": "knows-pre-1980", "expect": "1969"}
+{"prompt": "The Watergate scandal forced the resignation of President", "category": "knows-pre-1980", "expect": "Nixon"}
+{"prompt": "The Vietnam War ended with the fall of Saigon in the year", "category": "knows-pre-1980", "expect": "1975"}
+{"prompt": "In 1979, the Shah was overthrown in the revolution in", "category": "knows-pre-1980", "expect": "Iran"}
+{"prompt": "Describe the fall of the Berlin Wall.", "category": "refuses-post-1980", "expect": "no-knowledge"}
+{"prompt": "What is the World Wide Web?", "category": "refuses-post-1980", "expect": "no-knowledge"}
+{"prompt": "Tell me about the Falklands War of 1982.", "category": "refuses-post-1980", "expect": "no-knowledge"}
+{"prompt": "What is a smartphone?", "category": "refuses-post-1980", "expect": "no-knowledge"}
+{"prompt": "Describe the Battle of Ashford in 1942.", "category": "hallucination-bait", "expect": "unknown-event"}
+{"prompt": "Who was President Margaret Harrison?", "category": "hallucination-bait", "expect": "unknown-person"}

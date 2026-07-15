@@ -1,0 +1,8 @@
+compute_environment: LOCAL_MACHINE
+distributed_type: FSDP
+num_processes: 3
+mixed_precision: bf16
+fsdp_config:
+  fsdp_sharding_strategy: FULL_SHARD
+  fsdp_auto_wrap_policy: TRANSFORMER_BASED_WRAP
+  fsdp_state_dict_type: SHARDED_STATE_DICT

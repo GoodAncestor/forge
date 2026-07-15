@@ -1,0 +1,77 @@
+[project]
+name = "forge-env-cuda-datacenter"
+version = "0"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "torch",
+  "transformers",
+  "datasets",
+  "accelerate",
+  "peft",
+  "trl",
+  "bitsandbytes",
+  "unsloth>=2025",
+  "deepspeed",
+  "sentencepiece",
+  "llmcompressor",
+  "gptqmodel>=5",
+  "lm-eval",
+  "hf-transfer",
+]
+
+# NOT included, by design:
+# - flash-attn: installed by bootstrap/fleet-node.sh (Task 13) with
+#   --no-build-isolation on the target node — it doesn't resolve cleanly in a
+#   cross-platform lock. Do NOT add it here.
+# - xformers: unsloth==2025.7.2 pulls it in as an unconditional transitive
+#   dep, which would otherwise install a generic PyPI xformers wheel here —
+#   banned for the same reason as flash-attn (arch-correct build only, via
+#   bootstrap). It is deliberately neutralized below with
+#   [tool.uv] override-dependencies so it can never resolve out of this lock;
+#   bootstrap installs the real one. Do NOT add it to `dependencies` above.
+# - vllm: pins its own torch; keep it OUT of these projects (eval serving uses
+#   the fleet's existing vllm installs). lm-eval is enough for local eval.
+# - llama.cpp: compiled by bootstrap, not pip.
+#
+# unsloth is pinned >=2025 (not bare): unsloth<2025 (e.g. 2024.8) ships with
+# its real dependencies (torch/transformers/trl/peft/bitsandbytes) gated
+# behind pip extras, so an unqualified "unsloth" resolves to an empty-deps
+# shell of ~2yr-old code whenever anything else in the graph conflicts with
+# current unsloth's pins — a silent capability loss, not a real install. The
+# floor keeps the resolver on a real, current unsloth release.
+#
+# gptqmodel is pinned >=5 (not bare) for the identical reason: every
+# gptqmodel release below 5.0.0 (confirmed through 4.2.5, the version that
+# was resolving here) ships ALL of its real dependencies gated behind pip
+# extras (`[vllm]`, `[eval]`, `[hf]`, etc.) — an unqualified "gptqmodel" has
+# zero install_requires and resolves to a dependency-less shell. >=5 is the
+# newest floor that still resolves: gptqmodel>=5.8 and the 6.x/7.x lines
+# require transformers>=5.2/5.4, which conflicts with every unsloth>=2025
+# release (all of which cap transformers well below 5.x) once llmcompressor
+# is also in the graph — so this floor pins the resolver to gptqmodel 5.7.0,
+# the newest real (non-stub) release that coexists with unsloth+llmcompressor.
+
+[tool.uv]
+# xformers is an unconditional transitive dep of unsloth==2025.7.2 (unsloth
+# ships no extras/markers to opt out of it). This rewrites the requirement to
+# a marker that is never true for any environment this project locks for
+# (see `environments` below), so uv drops xformers from the resolved graph
+# entirely instead of pulling a generic PyPI wheel. The real, arch-correct
+# xformers is installed by bootstrap/fleet-node.sh (Task 13) — see the
+# NOT-included note above.
+override-dependencies = ["xformers ; sys_platform == 'never'"]
+# Lock is restricted to Linux: these projects only ever run on the fleet's
+# Linux GPU nodes (Task 11's runner uses `uv run --project envs/<profile>`
+# there), the cu128 torch index has no macOS wheels, and without this
+# restriction uv's universal resolver drags in macOS/Windows-only branches
+# (e.g. unsloth-zoo's mac-only mlx-vlm dependency) that produce spurious
+# cross-platform conflicts unrelated to the real deployment target.
+environments = ["sys_platform == 'linux'"]
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
