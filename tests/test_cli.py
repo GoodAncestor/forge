@@ -18,9 +18,11 @@ def test_unknown_command_exits_nonzero():
 
 def test_config_defaults(monkeypatch):
     monkeypatch.delenv("FORGE_DATA_CAP_TB", raising=False)
+    monkeypatch.delenv("FORGE_FLEET_URL", raising=False)
     import importlib
     from forge import config
     importlib.reload(config)
     assert config.DATA_CAP_TB == 50.0
     assert config.DATA_ROOT == "/mnt/models/datasets"
-    assert config.FLEET_URL == "http://192.168.77.36:8096"
+    # default carries no fleet-specific address; the real URL is set via env
+    assert config.FLEET_URL == "http://localhost:8096"

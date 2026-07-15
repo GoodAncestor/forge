@@ -36,21 +36,21 @@ def make_client(monkeypatch, responses):
 
 
 def test_acquire_success(monkeypatch):
-    lo = {"id": "abc", "holder": "h", "target": {"type": "node", "name": "alien02"},
+    lo = {"id": "abc", "holder": "h", "target": {"type": "node", "name": "node2"},
           "mode": "exclusive", "notes": "", "acquired": "t", "expires": "t2"}
     c, calls = make_client(monkeypatch, [(200, {"ok": True, "lease": lo})])
-    got = c.acquire("h", "node", "alien02", ttl_sec=28800, notes="train")
+    got = c.acquire("h", "node", "node2", ttl_sec=28800, notes="train")
     assert got["id"] == "abc"
     assert calls[0]["url"] == "http://fleet:8096/leases/acquire"
     assert calls[0]["headers"]["Authorization"] == "Bearer s3cr3t"
-    assert calls[0]["body"]["target"] == {"type": "node", "name": "alien02"}
+    assert calls[0]["body"]["target"] == {"type": "node", "name": "node2"}
     assert calls[0]["body"]["ttl_sec"] == 28800
 
 
 def test_acquire_refused_raises(monkeypatch):
     c, _ = make_client(monkeypatch, [(409, {"ok": False, "error": "already held by x"})])
     with pytest.raises(lease.LeaseRefused, match="already held"):
-        c.acquire("h", "node", "alien02")
+        c.acquire("h", "node", "node2")
 
 
 def test_unreachable_raises(monkeypatch):
@@ -85,11 +85,11 @@ def test_floor_target_includes_min_floor(monkeypatch):
 
 
 def test_release_and_node(monkeypatch):
-    fleet = {"nodes": [{"name": "alien02", "serving": []}, {"name": "ai-silo", "serving": [{"model": "m"}]}]}
+    fleet = {"nodes": [{"name": "node2", "serving": []}, {"name": "node-multi", "serving": [{"model": "m"}]}]}
     c, calls = make_client(monkeypatch, [(200, {"ok": True, "released": "abc", "existed": True}),
                                      (200, fleet), (200, fleet)])
     assert c.release("abc") is True
-    assert c.node("ai-silo")["serving"] == [{"model": "m"}]
+    assert c.node("node-multi")["serving"] == [{"model": "m"}]
     assert c.node("ghost") is None
     assert calls[0]["url"] == "http://fleet:8096/leases/release"
     assert calls[0]["body"] == {"id": "abc"}

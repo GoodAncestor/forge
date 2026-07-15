@@ -221,7 +221,7 @@ def register(subparsers):
     p.add_argument("--host", required=True)
     p.add_argument("--target-type", default="node", choices=["node", "gpu"])
     p.add_argument("--gpu-name", default=None,
-                   help="gpu target name, e.g. 'ai-silo:2' (required with --target-type gpu)")
+                   help="gpu target name, e.g. 'node:2' (required with --target-type gpu)")
     p.add_argument("--off-fleet", action="store_true")
     p.add_argument("--run-root", default=None)
     p.add_argument("--dry-run", action="store_true")

@@ -114,7 +114,7 @@ def test_fleet_requires_lease_and_releases(tmp_path, monkeypatch):
     client = StubClient()
     monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
     p = _write(tmp_path, RECIPE)
-    rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
+    rc = run_mod.execute(recipe_path=p, host="node2", off_fleet=False,
                          run_root=tmp_path / "runs", as_json=True,
                          use_uv_project=False)
     assert rc == 0
@@ -125,7 +125,7 @@ def test_serving_node_warns(tmp_path, monkeypatch, capsys):
     client = StubClient()
     monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
     p = _write(tmp_path, RECIPE)
-    run_mod.execute(recipe_path=p, host="ai-silo", off_fleet=False,
+    run_mod.execute(recipe_path=p, host="node-multi", off_fleet=False,
                     run_root=tmp_path / "runs", as_json=False,
                     use_uv_project=False)
     err = capsys.readouterr().err
@@ -137,7 +137,7 @@ def test_heartbeat_lost_pauses_job(tmp_path, monkeypatch):
     monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
     monkeypatch.setattr(run_mod, "LeaseHeartbeat", InstantLostHB)
     p = _write(tmp_path, SLEEPER)
-    rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
+    rc = run_mod.execute(recipe_path=p, host="node2", off_fleet=False,
                          run_root=tmp_path / "runs", as_json=True,
                          use_uv_project=False, poll_sec=0.1)
     assert rc == 75
@@ -150,7 +150,7 @@ def test_launch_failure_releases_lease_and_writes_manifest(tmp_path, monkeypatch
     client = StubClient()
     monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
     p = _write(tmp_path, RECIPE.replace("{python}", "/nonexistent/binary-xyz"))
-    rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
+    rc = run_mod.execute(recipe_path=p, host="node2", off_fleet=False,
                          run_root=tmp_path / "runs", as_json=True,
                          use_uv_project=False, poll_sec=0.1)
     assert rc == 3
@@ -164,7 +164,7 @@ def test_sigkilled_child_reports_failed_not_paused(tmp_path, monkeypatch):
     monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
     monkeypatch.setattr(run_mod, "LeaseHeartbeat", InstantLostHB)
     p = _write(tmp_path, IGNORER)
-    rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
+    rc = run_mod.execute(recipe_path=p, host="node2", off_fleet=False,
                          run_root=tmp_path / "runs", as_json=True,
                          use_uv_project=False, poll_sec=0.1)
     assert rc == 3
@@ -283,7 +283,7 @@ def test_refused_lease_does_not_create_run_dir(tmp_path, monkeypatch):
     client = RefusingClient()
     monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
     p = _write(tmp_path, RECIPE)
-    rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
+    rc = run_mod.execute(recipe_path=p, host="node2", off_fleet=False,
                          run_root=tmp_path / "runs", as_json=True,
                          use_uv_project=False)
     assert rc == 2
@@ -305,7 +305,7 @@ def test_mkdir_failure_still_releases_lease(tmp_path, monkeypatch):
     p = _write(tmp_path, RECIPE)
     blocker = tmp_path / "runs"
     blocker.write_text("not a directory")
-    rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
+    rc = run_mod.execute(recipe_path=p, host="node2", off_fleet=False,
                          run_root=blocker, as_json=True,
                          use_uv_project=False, poll_sec=0.1)
     assert rc == 3
@@ -346,7 +346,7 @@ def test_run_posts_paused_on_checkpoint_exit(tmp_path, monkeypatch):
     monkeypatch.setattr(run_mod, "LeaseClient", lambda *a, **k: client)
     monkeypatch.setattr(run_mod, "LeaseHeartbeat", InstantLostHB)
     p = _write(tmp_path, SLEEPER)
-    rc = run_mod.execute(recipe_path=p, host="alien02", off_fleet=False,
+    rc = run_mod.execute(recipe_path=p, host="node2", off_fleet=False,
                          run_root=tmp_path / "runs", as_json=True,
                          use_uv_project=False, poll_sec=0.1)
     assert rc == 75

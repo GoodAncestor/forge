@@ -2,28 +2,25 @@
 # status: locked  = uv.lock committed and smoke-tested on real hardware
 #         locked-untested = uv.lock maintained, no hardware yet (datacenter)
 #         stub    = package list only, locked when hardware is first offered
+#
+# hosts/smoke_host are NOT defined here. They are physical fleet topology and
+# come from a private overlay at $FORGE_FLEET_CONFIG/profiles.hosts.yaml
+# (see src/forge/envs.py:_load_overlay). Without an overlay every profile
+# resolves to an empty fleet — bind it to your own hardware to run jobs.
 profiles:
   cuda-ada:
     description: "RTX 4090 class (sm_89, 24GB)"
     torch_index: "https://download.pytorch.org/whl/cu128"
-    hosts: [ai01, ai02]
-    smoke_host: ai02
     status: locked
   cuda-blackwell:
     description: "RTX 5090 (32GB) + RTX PRO 6000 (96GB, multi-GPU) — sm_120"
     torch_index: "https://download.pytorch.org/whl/cu128"
-    hosts: [alien01, alien02, alien03, ai-silo]
-    smoke_host: alien03
     status: locked
   cuda-datacenter:
-    description: "B300 NV8 / GB300 / Vera Rubin (on order, ~Q4 2026) and loaner H100/B200/B300 nodes"
+    description: "Datacenter GPUs — H100 / B200 / B300 / GB300 class"
     torch_index: "https://download.pytorch.org/whl/cu128"
-    hosts: []
-    smoke_host: null
     status: locked-untested
   rocm:
-    description: "AMD MI355-class loaners (CDNA4). Stub until hardware is offered."
+    description: "AMD MI355-class (CDNA4). Stub until hardware is offered."
     torch_index: "https://download.pytorch.org/whl/rocm6.4"
-    hosts: []
-    smoke_host: null
     status: stub

@@ -1,5 +1,5 @@
 # The v1 ACCEPTANCE DEMO with FSDP. Same model/datasets as qlora variant.
-# 3-GPU training on ai-silo (3× RTX PRO 6000).
+# 3-GPU training on a multi-GPU node (e.g. 3× RTX PRO 6000).
 name: talkie-1930to1980-fsdp
 profile: cuda-blackwell
 method: cpt-qlora

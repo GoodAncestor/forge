@@ -1,7 +1,7 @@
 import os
 import socket
 
-FLEET_URL = os.environ.get("FORGE_FLEET_URL", "http://192.168.77.36:8096")
+FLEET_URL = os.environ.get("FORGE_FLEET_URL", "http://localhost:8096")
 LEASE_SECRET = os.environ.get("FORGE_LEASE_SECRET", "")
 DATA_ROOT = os.environ.get("FORGE_DATA_ROOT", "/mnt/models/datasets")
 MODEL_ROOT = os.environ.get("FORGE_MODEL_ROOT", "/mnt/models")

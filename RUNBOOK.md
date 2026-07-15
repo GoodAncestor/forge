@@ -4,8 +4,11 @@ You are operating the Good Ancestor model lab. Everything below is CLI + JSON.
 Humans only: merge PRs, flip `approved:` flags, sign off on production-node runs.
 
 ## Environment
-- Aggregator/fleet state: GET $FORGE_FLEET_URL/fleet.json (default http://192.168.77.36:8096)
-- Required env: FORGE_LEASE_SECRET (from jumpbox fleet secrets). Optional:
+- Aggregator/fleet state: GET $FORGE_FLEET_URL/fleet.json (set FORGE_FLEET_URL
+  to your aggregator; default http://localhost:8096)
+- FORGE_FLEET_CONFIG: path to the private fleet overlay (profiles.hosts.yaml)
+  that binds each profile to real hosts. Unset → profiles have no hosts.
+- Required env: FORGE_LEASE_SECRET (from your fleet secrets). Optional:
   FORGE_DATA_ROOT (/mnt/models/datasets), FORGE_MODEL_ROOT (/mnt/models),
   FORGE_DATA_CAP_TB (50 — meters the dataset subtree only, NOT the models sharing
   the pool; the practical ceiling is pool free space — keep ZFS ~20% free),
@@ -53,12 +56,18 @@ Humans only: merge PRs, flip `approved:` flags, sign off on production-node runs
   datasets/manifest.yaml via PR. Do not work around the gate.
 
 ## Env maintenance
-    forge --json env update           # lock upgrade + leased smoke + PR
-- Weekly cron does this. Read reports/env-update-*.json; escalate if ok=false.
+    forge --json env update           # re-resolve lockfiles + open PR
+- Weekly cron does this. It runs where the cron lives (no GPU needed): it only
+  re-resolves the locks and opens a PR. `ok` = locks resolved cleanly.
+- Hardware smoke is deferred to PR review: the PR body carries the exact
+  `forge run recipes/smoke.yaml ...` command to run on each profile's
+  smoke_host before merging. Read reports/env-update-*.json; escalate if
+  ok=false (a lock failed to resolve).
 - NEVER merge the PR yourself.
 
 ## Safety rails you must respect
-- One purposeful connection at a time to any host (UniFi IPS blocks scanners).
+- One purposeful connection at a time to any host (network IPS blocks scanners).
 - Never modify NAS config. Never download unapproved models/datasets.
-- ai-silo serves production: floor lease + human sign-off before touching it.
+- Some nodes serve production inference: floor lease + human sign-off before
+  touching a node whose `serving` list is non-empty.
 - Abliterated/pruned artifacts: NAS only, never push to HF.

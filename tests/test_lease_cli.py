@@ -22,7 +22,7 @@ class StubClient:
         return True
 
     def fleet(self):
-        return {"nodes": [{"name": "alien02", "held_by": "someone",
+        return {"nodes": [{"name": "node2", "held_by": "someone",
                            "serving": []}]}
 
 
@@ -34,7 +34,7 @@ class DownClient(StubClient):
 def test_acquire_ok(monkeypatch, capsys):
     monkeypatch.setattr(lease_cli, "LeaseClient", StubClient)
     rc = cli.main(["--json", "lease", "acquire", "--target-type", "node",
-                   "--name", "alien02"])
+                   "--name", "node2"])
     assert rc == 0
     assert json.loads(capsys.readouterr().out)["lease"]["id"] == "L1"
 
@@ -50,7 +50,7 @@ def test_acquire_refused_exit_2(monkeypatch, capsys):
 def test_unreachable_exit_4(monkeypatch, capsys):
     monkeypatch.setattr(lease_cli, "LeaseClient", DownClient)
     rc = cli.main(["--json", "lease", "acquire", "--target-type", "node",
-                   "--name", "alien02"])
+                   "--name", "node2"])
     assert rc == 4
 
 
@@ -64,7 +64,7 @@ def test_status(monkeypatch, capsys):
 
 class NullServingClient(StubClient):
     def fleet(self):
-        return {"nodes": [{"name": "alien02", "held_by": None, "serving": None}]}
+        return {"nodes": [{"name": "node2", "held_by": None, "serving": None}]}
 
 
 def test_status_guards_null_serving(monkeypatch, capsys):
