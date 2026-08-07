@@ -21,4 +21,15 @@ if [ ! -d /opt/llama.cpp ]; then
 fi
 (cd "$REPO/envs/$PROFILE" && uv pip install -r /opt/llama.cpp/requirements.txt) \
   || echo "WARN: llama.cpp python requirements failed — GGUF conversion may lack the gguf module"
+
+# abliterix — abliteration tool for recipes/abliterate-abliterix.yaml. Not in
+# the profile lock: it pulls vLLM, whose resolution we do not want to pin the
+# training envs to. Installed into the profile env so the recipe's tool_cmd
+# finds it on PATH under `uv run --project envs/$PROFILE`.
+(cd "$REPO/envs/$PROFILE" && uv pip install -U abliterix) \
+  || echo "WARN: abliterix install failed — recipes/abliterate-abliterix.yaml will not run"
+# Print the real CLI so the operator can reconcile the recipe's tool_cmd
+# against this build before trusting it (the argv there is README-derived).
+(cd "$REPO/envs/$PROFILE" && uv run abliterix --help 2>&1 | head -40) \
+  || echo "WARN: abliterix --help failed — VERIFY tool_cmd before any run"
 echo "OK: $PROFILE ready on $(hostname)"

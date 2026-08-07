@@ -1,0 +1,42 @@
+# Abliteration via abliterix (github.com/wuwangzhang1216/abliterix).
+#
+# abliterix runs an Optuna search over abliteration parameters, scoring
+# refusal rate against KL divergence from the base model, so it tunes the
+# intervention rather than applying a fixed one. It ships configs for dense,
+# MoE, SSM/hybrid, and vision-language families, and exports either a
+# reversible LoRA adapter or baked projections plus a reproducibility
+# manifest with SHA256 weight hashes.
+#
+# ⚠ tool_cmd below is transcribed from the project README (read 2026-08-07),
+# NOT yet verified against an installed build. forge's rule stands: run
+# `abliterix --help` on the target node and reconcile this argv before the
+# first real run. It is pre-filled rather than left null because the shape is
+# documented and stable; it is still an unverified claim until someone looks.
+#
+# Requires vLLM, so it does not install or run on macOS — this is a
+# CUDA-node recipe.
+#
+# profile is cuda-datacenter because the models this was wired in for
+# (GLM-5.2-abliterated at 420 GiB, Kimi-K3.0 at 802 GiB) exceed every
+# Berkeley GPU; expect to run it on rented 8×B200/B300 via `forge cloud`.
+name: abliterate-abliterix
+profile: cuda-datacenter
+method: abliterate
+model_path: CHANGE-ME/relative-to-model-root
+datasets: []
+command: ["python", "-m", "forge.surgery.abliterate", "--recipe", "{recipe_path}", "--run-dir", "{run_dir}"]
+params:
+  max_refusals: 0
+  tool_cmd:
+    - abliterix
+    - --model
+    - "{model_path}"
+    - --non-interactive
+    - --non-interactive-output-dir
+    - "{run_dir}/abliterated"
+  # Optional flags, add to tool_cmd once verified:
+  #   --detection.llm-judge          semantic scoring; needs OPENROUTER_API_KEY
+  #   --model.quant-method bnb_4bit  4-bit load to cut VRAM
+  #   --reproduce <manifest.json>    replay a previous search exactly
+grace_sec: 600
+push_to_hf: false
