@@ -14,12 +14,25 @@ stating in code rather than rediscovering at spend time:
    cloud-accounts.md), which does not go far against Blackwell-class hourly
    rates. Azure is the small lane; treat it as such.
 
-Auth: `az login` writes ~/.azure/, which satisfies the credential without env
+Auth: `az login` writes ~/.azure/azureProfile.json (the signed-in account's
+subscription/tenant record), which satisfies the credential without env
 vars. The service-principal triple is the headless path.
+
+Deliberately NOT keyed on the bare ~/.azure/ directory: the Azure CLI creates
+that directory (config.txt, telemetry cache, clouds.config, ...) on the
+*first invocation of any `az` command*, login or not — `az --version` alone
+is enough. Treating the directory's mere existence as "logged in" would let
+bootstrap/CI tooling that only ever runs `az --version` flip this preflight
+to green with no real subscription access behind it, which is exactly the
+false-positive this layer exists to avoid. azureProfile.json is written only
+by a successful `az login` (or `az account set` afterward), so its presence
+is a real signal.
 """
 from forge.providers.base import Credential, Provider
 
-AZURE_CONFIG = "~/.azure"
+#: Written only by a successful `az login` — see module docstring for why
+#: this, and not the bare ~/.azure/ directory, is the credential's `path`.
+AZURE_LOGIN_PROFILE = "~/.azure/azureProfile.json"
 
 
 class AzureProvider(Provider):
@@ -31,9 +44,9 @@ class AzureProvider(Provider):
     credentials = (
         Credential("AZURE_SUBSCRIPTION_ID",
                    "Subscription holding the nonprofit credit grant",
-                   path=AZURE_CONFIG),
+                   path=AZURE_LOGIN_PROFILE),
         Credential("AZURE_TENANT_ID",
-                   "Directory (tenant) id", path=AZURE_CONFIG),
+                   "Directory (tenant) id", path=AZURE_LOGIN_PROFILE),
         Credential("AZURE_CLIENT_ID",
                    "Service-principal app id; omit when using `az login`",
                    required=False),

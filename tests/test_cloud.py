@@ -24,8 +24,13 @@ def test_modal_declares_eight_gpu_blackwell():
     assert "B200:8" in providers.get("modal").gpus
 
 
-def test_preflight_reports_missing_credentials_by_name(monkeypatch):
+def test_preflight_reports_missing_credentials_by_name(monkeypatch, tmp_path):
+    """Regression: `satisfied_by` checks `Path(self.path).expanduser()` against
+    the *real* filesystem, so this must not run against the real $HOME — a
+    dev machine with a real ~/.modal.toml (exactly the environment this
+    layer exists for) would otherwise flip `ok` to True and hide the bug."""
     monkeypatch.setattr("shutil.which", lambda n: "/usr/bin/" + n)
+    monkeypatch.setenv("HOME", str(tmp_path))
     r = providers.get("modal").preflight(env={})
     assert r["ok"] is False
     missing = {m["env"] for m in r["missing"]}
@@ -89,8 +94,40 @@ def test_providers_command_lists_gpu_shapes(capsys):
     assert "modal" in out and "azure" in out and "B200:8" in out
 
 
-def test_human_preflight_marks_missing_lines(monkeypatch):
+def test_human_preflight_marks_missing_lines(monkeypatch, tmp_path):
+    """Same real-$HOME leak as test_preflight_reports_missing_credentials_by_name,
+    for Azure's ~/.azure path credential."""
     monkeypatch.setattr("shutil.which", lambda n: None)
+    monkeypatch.setenv("HOME", str(tmp_path))
     text = cloud._human_preflight(providers.get("azure").preflight(env={}))
     assert "NOT READY" in text
     assert "MISSING  AZURE_SUBSCRIPTION_ID" in text
+
+
+def test_bare_azure_dir_does_not_satisfy_credential(monkeypatch, tmp_path):
+    """`az --version` (and any other `az` invocation) creates ~/.azure/ for
+    telemetry/config even without a login — that must NOT read as ready.
+    Only a real `az login` artifact (azureProfile.json) should."""
+    monkeypatch.setattr("shutil.which", lambda n: "/usr/bin/" + n)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    (tmp_path / ".azure").mkdir()
+    (tmp_path / ".azure" / "config").write_text("[core]\n")
+
+    r = providers.get("azure").preflight(env={})
+    assert r["ok"] is False
+    missing = {m["env"] for m in r["missing"]}
+    assert {"AZURE_SUBSCRIPTION_ID", "AZURE_TENANT_ID"} <= missing
+
+
+def test_azure_login_profile_satisfies_credential(monkeypatch, tmp_path):
+    """A real `az login` writes ~/.azure/azureProfile.json; that should
+    satisfy the credential without env vars, same as Modal's token file."""
+    monkeypatch.setattr("shutil.which", lambda n: "/usr/bin/" + n)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    (tmp_path / ".azure").mkdir()
+    (tmp_path / ".azure" / "azureProfile.json").write_text("{}")
+
+    r = providers.get("azure").preflight(env={})
+    assert r["ok"] is True
+    assert r["resolved"]["AZURE_SUBSCRIPTION_ID"] == "file"
+    assert r["resolved"]["AZURE_TENANT_ID"] == "file"
