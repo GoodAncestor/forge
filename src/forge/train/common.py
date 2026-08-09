@@ -34,6 +34,29 @@ def read_recipe(path):
     return yaml.safe_load(Path(path).read_text())
 
 
+def render_tool_cmd(tool_cmd, recipe, run_dir, model_root):
+    """Substitute forge's paths into an external tool's argv template.
+
+    Shared by the surgery wrappers so both expose the same placeholders. In
+    particular `{model_path}` is what lets one recipe's tool_cmd be reused
+    across models instead of hardcoding a path into the argv — it resolves
+    relative model_path values against model_root, and passes anything
+    absolute (or an HF repo id, which most tools accept in the same slot)
+    through untouched.
+    """
+    model_path = recipe.get("model_path") or ""
+    if model_path and not Path(model_path).is_absolute() and "/" in model_path:
+        # Relative NAS-style path, e.g. "talkie-lm/talkie-1930-13b-base".
+        # A bare name with no slash is ambiguous with an HF repo id, so only
+        # rewrite when it already looks like a path under the model root.
+        candidate = Path(model_root) / model_path
+        if candidate.exists():
+            model_path = str(candidate)
+    return [c.format(model_root=model_root, run_dir=run_dir,
+                     model_path=model_path)
+            for c in tool_cmd]
+
+
 def make_stop_callback(flag):
     """Build the transformers TrainerCallback lazily (torch-free import)."""
     from transformers import TrainerCallback

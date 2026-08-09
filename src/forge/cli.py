@@ -30,6 +30,9 @@ def build_parser():
     from forge import run as run_mod
     run_mod.register(sub)
 
+    from forge import cloud
+    cloud.register(sub)
+
     # later tasks append: from forge import envupdate
     # and call <module>.register(sub)
     return p

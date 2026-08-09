@@ -21,8 +21,8 @@ def main(argv=None):
         print("params.tool_cmd is required: set the verified tool argv in the "
               "recipe (see recipe notes)", file=sys.stderr)
         return 2
-    cmd = [c.format(model_root=config.MODEL_ROOT, run_dir=args.run_dir)
-           for c in tool_cmd]
+    cmd = common.render_tool_cmd(tool_cmd, recipe, args.run_dir,
+                                 config.MODEL_ROOT)
     result = subprocess.run(cmd)
     if result.returncode != 0:
         return common.EXIT_JOB
