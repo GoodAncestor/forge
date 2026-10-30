@@ -4,6 +4,9 @@ version = "0"
 requires-python = ">=3.11,<3.13"
 dependencies = [
   "torch",
+  # Direct so [tool.uv.sources] can pin it to the torch index (sources only
+  # apply to direct dependencies); it is otherwise pulled in transitively.
+  "torchvision",
   "transformers",
   "datasets",
   "accelerate",
@@ -69,7 +72,11 @@ override-dependencies = ["xformers ; sys_platform == 'never'"]
 environments = ["sys_platform == 'linux'"]
 
 [tool.uv.sources]
+# torchvision ships compiled operators built against one exact torch build;
+# from PyPI it matches a different CUDA build than the cu128 torch above and
+# its ops fail to load (unsloth, peft and transformers imports then fail).
 torch = { index = "pytorch" }
+torchvision = { index = "pytorch" }
 
 [[tool.uv.index]]
 name = "pytorch"
