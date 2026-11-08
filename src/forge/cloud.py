@@ -6,7 +6,7 @@ missing when it could not. Job submission is a later, separately-reviewed
 change — the gap between "plumbing exists" and "plumbing can spend money"
 should be crossed on purpose.
 """
-from forge import providers
+from forge import providers, weights
 from forge.output import emit
 
 EXIT_OK = 0
@@ -52,10 +52,25 @@ def cmd_preflight(args):
     else:
         selected = list(providers.PROVIDERS.values())
 
+    ws = None
+    ws_status = {"status": "not_requested"}
+    if getattr(args, "weight_source", None):
+        try:
+            ws = weights.parse(args.weight_source)
+        except weights.BadWeightSpec as e:
+            emit({"ok": False, "error": str(e)}, args.as_json)
+            return EXIT_REFUSED
+        ws_status = weights.preflight(ws)
+        ws_status["status"] = "ready" if ws_status["ok"] else "not_ready"
+
     results = [p.preflight() for p in selected]
-    ok = all(r["ok"] for r in results)
-    emit({"ok": ok, "results": results}, args.as_json,
-         human="\n".join(_human_preflight(r) for r in results))
+    ok = all(r["ok"] for r in results) and (ws is None or ws_status["ok"])
+    human = "\n".join(_human_preflight(r) for r in results)
+    if ws is not None:
+        human += (f"\nweights  {ws_status['status'].upper()}  {ws.kind}:{ws.repo}@{ws.revision}"
+                  + "".join(f"\n    {k:18} {v}" for k, v in ws_status["checks"].items()))
+    emit({"ok": ok, "results": results, "weight_source": ws_status},
+         args.as_json, human=human)
     # Not-ready is information, not failure: this command exists to be run
     # before the credentials arrive, so a red report still exits 0.
     return EXIT_OK
@@ -72,4 +87,7 @@ def register(subparsers):
                           help="report which credentials/CLIs are present")
     pre.add_argument("--provider", default=None,
                      help="check one provider instead of all")
+    pre.add_argument("--weight-source", default=None, metavar="KIND:ORG/REPO[@REV]",
+                     help="also check where the job's weights come from "
+                          "(hf: or private-hf:); read-only, no repo is created")
     pre.set_defaults(func=cmd_preflight)
