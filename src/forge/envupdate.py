@@ -88,6 +88,23 @@ def _pr_body(diffs, smoke):
     return "\n".join(lines)
 
 
+def _open_env_update_prs():
+    """Branch names of OPEN env-update-* PRs, or None if gh could not answer.
+
+    Weekly runs used to stack a new lock PR on top of an unreviewed one
+    (#13-#17 were closed unmerged one by one). If an earlier one is still
+    open, this week's run skips PR creation instead; the report still lands.
+    """
+    try:
+        r = subprocess.run(["gh", "pr", "list", "-R", "GoodAncestor/forge",
+                            "--state", "open", "--json", "headRefName",
+                            "--jq", ".[].headRefName"],
+                           cwd=REPO_ROOT, capture_output=True, text=True, check=True)
+    except (subprocess.CalledProcessError, OSError):
+        return None
+    return [b for b in (r.stdout or "").split() if b.startswith("env-update-")]
+
+
 def cmd_update(args):
     profiles = envs.load_profiles()
     diffs, smoke = {}, {}
@@ -111,7 +128,13 @@ def cmd_update(args):
                      for k in ("changed", "added", "removed"))
     pr_url = None
     pr_error = None
+    pr_skipped = None
     if any_change and not args.no_pr:
+        open_prs = _open_env_update_prs()
+        if open_prs:
+            pr_skipped = ("earlier env-update PR still open: " + ", ".join(open_prs)
+                          + "; review or close it before a new one is opened")
+    if any_change and not args.no_pr and pr_skipped is None:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
         branch = f"env-update-{stamp}"
         try:
@@ -142,9 +165,12 @@ def cmd_update(args):
     payload = {"report": report, "diffs": diffs, "smoke": smoke, "pr": pr_url}
     if pr_error is not None:
         payload["pr_error"] = pr_error
+    if pr_skipped is not None:
+        payload["pr_skipped"] = pr_skipped
     emit(payload, args.as_json,
          human=f"report: {report}; pr: {pr_url or 'none'}"
-               + (f"; pr_error: {pr_error}" if pr_error else ""))
+               + (f"; pr_error: {pr_error}" if pr_error else "")
+               + (f"; pr_skipped: {pr_skipped}" if pr_skipped else ""))
     return EXIT_JOB if pr_error is not None else EXIT_OK
 
 

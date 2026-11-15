@@ -63,6 +63,8 @@ Humans only: merge PRs, flip `approved:` flags, sign off on production-node runs
   `forge run recipes/smoke.yaml ...` command to run on each profile's
   smoke_host before merging. Read reports/env-update-*.json; escalate if
   ok=false (a lock failed to resolve).
+- If an earlier env-update-* PR is still open, the run writes the report but
+  opens no new PR (`pr_skipped` in the JSON names the open branch).
 - NEVER merge the PR yourself.
 
 ## Safety rails you must respect

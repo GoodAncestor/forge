@@ -139,7 +139,7 @@ def test_cmd_update_pr_path(tmp_path, monkeypatch, capsys):
     # no hardware smoke subprocess runs anymore (no `uv run` calls at all)
     assert [c for c in calls if c[:2] == ["uv", "run"]] == []
     # gh must target the repo explicitly (origin may be an SSH host alias)
-    gh_calls = [c for c in calls if c[:1] == ["gh"]]
+    gh_calls = [c for c in calls if c[:3] == ["gh", "pr", "create"]]
     assert gh_calls and gh_calls[0][:5] == [
         "gh", "pr", "create", "-R", "GoodAncestor/forge"]
 
@@ -186,3 +186,58 @@ def test_cmd_update_pr_failure_recovers_branch(tmp_path, monkeypatch, capsys):
 
     assert rc == 3
     assert calls[-1] == ["git", "checkout", "main"]
+
+
+def test_cmd_update_skips_pr_while_earlier_env_update_pr_open(tmp_path, monkeypatch, capsys):
+    repo_root = _make_fake_repo(tmp_path)
+    calls = []
+
+    def fake_run(cmd, cwd=None, check=False, capture_output=False, text=False):
+        calls.append(list(cmd))
+        if cmd[:3] == ["uv", "lock", "--upgrade"]:
+            (Path(cwd) / "uv.lock").write_text(LOCK_AFTER)
+            return FakeResult(0)
+        if cmd[:3] == ["gh", "pr", "list"]:
+            return FakeResult(0, stdout="weight-source\nenv-update-20261102\n")
+        if cmd[:1] == ["gh"]:
+            return FakeResult(0, stdout=PR_URL + "\n")
+        return FakeResult(0)
+
+    monkeypatch.setattr(envupdate.subprocess, "run", fake_run)
+    monkeypatch.setattr(envupdate, "REPO_ROOT", repo_root)
+    monkeypatch.setattr(envupdate.envs, "load_profiles", _fake_profiles)
+
+    rc = envupdate.cmd_update(_make_args(tmp_path))
+
+    payload = json.loads(capsys.readouterr().out)
+    assert rc == 0
+    assert payload["pr"] is None
+    assert "env-update-20261102" in payload["pr_skipped"]
+    assert "weight-source" not in payload["pr_skipped"]
+    # report still written; no branch, push or PR create
+    assert Path(payload["report"]).exists()
+    assert not [c for c in calls if c[:2] in (["git", "checkout"], ["git", "push"])]
+    assert not [c for c in calls if c[:3] == ["gh", "pr", "create"]]
+
+
+def test_cmd_update_opens_pr_when_gh_list_fails(tmp_path, monkeypatch, capsys):
+    repo_root = _make_fake_repo(tmp_path)
+
+    def fake_run(cmd, cwd=None, check=False, capture_output=False, text=False):
+        if cmd[:3] == ["uv", "lock", "--upgrade"]:
+            (Path(cwd) / "uv.lock").write_text(LOCK_AFTER)
+            return FakeResult(0)
+        if cmd[:3] == ["gh", "pr", "list"]:
+            raise subprocess.CalledProcessError(1, cmd, output="", stderr="no auth")
+        if cmd[:1] == ["gh"]:
+            return FakeResult(0, stdout=PR_URL + "\n")
+        return FakeResult(0)
+
+    monkeypatch.setattr(envupdate.subprocess, "run", fake_run)
+    monkeypatch.setattr(envupdate, "REPO_ROOT", repo_root)
+    monkeypatch.setattr(envupdate.envs, "load_profiles", _fake_profiles)
+
+    rc = envupdate.cmd_update(_make_args(tmp_path))
+    payload = json.loads(capsys.readouterr().out)
+    assert rc == 0
+    assert payload["pr"] == PR_URL
