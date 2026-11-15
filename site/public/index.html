@@ -96,10 +96,10 @@
   .out-ok { color: #9FE0B6; }
   .run .line { display: block; }
   @media (prefers-reduced-motion: no-preference) {
-    .run .line { animation: type 0.35s steps(18, end) both; }
-    .run .line:nth-child(2) { animation-delay: 0.25s; }
-    .run .line:nth-child(3) { animation-delay: 0.5s; }
-    @keyframes type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+    .run.live .line { animation: appear 0.2s ease-out both; }
+    .run.live .line:nth-child(2) { animation-delay: 0.3s; }
+    .run.live .line:nth-child(3) { animation-delay: 0.6s; }
+    @keyframes appear { from { opacity: 0; } to { opacity: 1; } }
   }
   .caption { font-size: 0.88rem; color: var(--ink-2); margin: 0.8rem 0 0; }
 
@@ -292,6 +292,7 @@
     }
     btn.addEventListener('click', function () {
       hint.textContent = '';
+      run.classList.add('live');
       render(btn.getAttribute('aria-pressed') !== 'true');
     });
     render(false);
