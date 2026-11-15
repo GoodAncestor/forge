@@ -88,7 +88,31 @@ def _pr_body(diffs, smoke):
     return "\n".join(lines)
 
 
+def _sync_main():
+    """Bring the checkout to origin/main before re-resolving anything.
+
+    The locks are re-resolved from envs/*/pyproject.toml in THIS checkout and
+    the PR branch is cut from its HEAD, so a checkout that never pulls opens a
+    PR against a stale base: #19 (2026-11-02) was cut from 2a12efc, listed its
+    diff against that, and silently reverted the torchvision cu128 pin landed
+    in 4cbb8fa. Fast-forward only: a checkout with local commits on main is
+    refused rather than merged or reset.
+    """
+    for cmd in (["git", "checkout", "main"],
+                ["git", "fetch", "origin", "main"],
+                ["git", "merge", "--ff-only", "origin/main"]):
+        subprocess.run(cmd, cwd=REPO_ROOT, check=True)
+
+
 def cmd_update(args):
+    if not args.no_pr:
+        try:
+            _sync_main()
+        except subprocess.CalledProcessError as e:
+            emit({"report": None, "diffs": {}, "smoke": {}, "pr": None,
+                  "pr_error": "could not fast-forward main to origin/main: %s" % e},
+                 args.as_json, human="refused: main is not at origin/main (%s)" % e)
+            return EXIT_JOB
     profiles = envs.load_profiles()
     diffs, smoke = {}, {}
     for name, p in profiles.items():

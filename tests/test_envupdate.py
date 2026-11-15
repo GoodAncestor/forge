@@ -144,6 +144,52 @@ def test_cmd_update_pr_path(tmp_path, monkeypatch, capsys):
         "gh", "pr", "create", "-R", "GoodAncestor/forge"]
 
 
+def test_cmd_update_syncs_main_before_relocking(tmp_path, monkeypatch, capsys):
+    repo_root = _make_fake_repo(tmp_path)
+    calls = []
+
+    def fake_run(cmd, cwd=None, check=False, capture_output=False, text=False):
+        calls.append(list(cmd))
+        if cmd[:3] == ["uv", "lock", "--upgrade"]:
+            (Path(cwd) / "uv.lock").write_text(LOCK_AFTER)
+        if cmd[:1] == ["gh"]:
+            return FakeResult(0, stdout=PR_URL + "\n")
+        return FakeResult(0)
+
+    monkeypatch.setattr(envupdate.subprocess, "run", fake_run)
+    monkeypatch.setattr(envupdate, "REPO_ROOT", repo_root)
+    monkeypatch.setattr(envupdate.envs, "load_profiles", _fake_profiles)
+
+    assert envupdate.cmd_update(_make_args(tmp_path)) == 0
+    assert calls[:3] == [["git", "checkout", "main"],
+                         ["git", "fetch", "origin", "main"],
+                         ["git", "merge", "--ff-only", "origin/main"]]
+    first_lock = next(i for i, c in enumerate(calls) if c[:2] == ["uv", "lock"])
+    assert first_lock > 2
+
+
+def test_cmd_update_refuses_when_main_cannot_fast_forward(tmp_path, monkeypatch, capsys):
+    repo_root = _make_fake_repo(tmp_path)
+    calls = []
+
+    def fake_run(cmd, cwd=None, check=False, capture_output=False, text=False):
+        calls.append(list(cmd))
+        if cmd[:3] == ["git", "merge", "--ff-only"]:
+            raise subprocess.CalledProcessError(128, cmd)
+        return FakeResult(0)
+
+    monkeypatch.setattr(envupdate.subprocess, "run", fake_run)
+    monkeypatch.setattr(envupdate, "REPO_ROOT", repo_root)
+    monkeypatch.setattr(envupdate.envs, "load_profiles", _fake_profiles)
+
+    rc = envupdate.cmd_update(_make_args(tmp_path))
+    payload = json.loads(capsys.readouterr().out)
+    assert rc == 3
+    assert "fast-forward" in payload["pr_error"]
+    assert not [c for c in calls if c[:2] == ["uv", "lock"]]
+    assert not [c for c in calls if c[:1] == ["gh"]]
+
+
 def test_pr_body_defers_smoke_to_host():
     diffs = {"cuda-x": {"changed": {"torch": ["2.11.0", "2.10.0"]},
                         "added": {}, "removed": {}}}
