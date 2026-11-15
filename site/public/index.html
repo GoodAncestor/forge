@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Forge — an agent-operated model lab</title>
+<title>Forge — an automated model recasting toolkit</title>
 <meta name="description" content="Forge is the Good Ancestor Foundation's open toolkit for training, fine-tuning, quantizing and editing models on a shared GPU fleet. Agents do the work; people approve it.">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='14' width='24' height='6' rx='1' fill='%232E5C9A'/%3E%3Crect x='10' y='20' width='12' height='8' fill='%23A8692F'/%3E%3C/svg%3E">
@@ -63,10 +63,10 @@
   .hero { display: grid; grid-template-columns: 1fr; gap: 2.5rem; padding: 3rem 0 4rem; align-items: center; }
   @media (min-width: 900px) { .hero { grid-template-columns: 1.05fr 1fr; padding: 5rem 0 6rem; } }
   h1 {
-    font-size: clamp(2.6rem, 6.4vw, 4.6rem); line-height: 0.98; letter-spacing: -0.03em;
+    font-size: clamp(3.4rem, 9vw, 6.4rem); line-height: 0.95; letter-spacing: -0.03em;
     font-weight: 780; font-stretch: 78%; margin: 0 0 1.5rem;
   }
-  h1 span { display: block; font-weight: 340; font-stretch: 100%; }
+  h1 span { display: block; font-size: 0.5em; line-height: 1.1; letter-spacing: -0.015em; font-weight: 360; font-stretch: 100%; margin-top: 0.35em; }
   .lede { font-size: 1.2rem; color: var(--ink-2); margin: 0 0 1.75rem; max-width: 34rem; }
   .actions { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: center; }
   .btn {
@@ -159,11 +159,11 @@
   <main>
     <div class="hero">
       <div>
-        <h1>Agents do the work.<span>A person flips the flag.</span></h1>
+        <h1>Forge<span>An automated model recasting toolkit</span></h1>
         <p class="lede">Forge is the Good Ancestor Foundation's open toolkit for running model work on hardware we own: training, fine-tuning, quantization and model surgery on a shared GPU fleet, operated by AI agents and governed by people.</p>
         <div class="actions">
           <a class="btn" href="https://github.com/GoodAncestor/forge">Read the source on GitHub</a>
-          <a href="#human">What the human does</a>
+          <a href="#human">How it works</a>
         </div>
       </div>
 
@@ -173,7 +173,7 @@
 <pre><span class="k">- name:</span> llama-nemotron-post-training
   <span class="k">source:</span> hf://nvidia/Llama-Nemotron-Post-Training-Dataset
   <span class="k">license:</span> cc-by-4.0
-  <span class="k">approved:</span> <button class="toggle" id="toggle" type="button" aria-pressed="false" aria-describedby="flag-hint">false</button> <span class="hint" id="flag-hint">← flip it</span></pre>
+  <span class="k">approved:</span> <button class="toggle" id="toggle" type="button" aria-pressed="false" aria-describedby="flag-hint">false</button> <span class="hint" id="flag-hint">← click to change</span></pre>
           <div class="run" id="run" aria-live="polite"></div>
         </div>
         <figcaption class="caption">An example manifest entry. Agents can propose a dataset, but only a person, through a reviewed pull request, can set <code>approved: true</code>.</figcaption>
@@ -220,20 +220,20 @@
 
     <section aria-labelledby="human" id="human">
       <div class="two">
-        <h2>The human's job is small on purpose</h2>
+        <h2>How it works</h2>
         <div class="measure">
           <ul class="duties">
-            <li>Review the pull requests. <em>Agents propose changes. None merge themselves.</em></li>
-            <li>Decide what's approved. <em>The <code>approved:</code> flags belong to people.</em></li>
+            <li>People review pull requests. <em>Automated changes never merge themselves.</em></li>
+            <li>People approve datasets. <em>Only a person sets <code>approved: true</code>.</em></li>
           </ul>
-          <p>Everything else is mechanical, tested and automated. Approval gates are final: a refused fetch stays refused until a person changes the manifest, and agents don't work around it.</p>
+          <p>Agents handle the rest: resolving environments, fetching approved datasets and running leased jobs. A refused fetch stays refused until the manifest changes.</p>
         </div>
       </div>
     </section>
 
     <section aria-labelledby="codes-h">
-      <h2 id="codes-h">Failures that say what they are</h2>
-      <p class="measure">Every Forge command exits with a code that tells a person or an agent what kind of stop it was, so a refusal is never mistaken for a crash.</p>
+      <h2 id="codes-h">Exit codes</h2>
+      <p class="measure">Each Forge command exits with a code that says why it stopped.</p>
       <div class="codes">
         <div class="code c2"><b>2</b><span>Refused</span><small>A gate said no. Wait for a human decision; don't retry.</small></div>
         <div class="code c3"><b>3</b><span>Job failed</span><small>The work itself broke. Read the run record.</small></div>
@@ -244,7 +244,7 @@
 
     <section aria-labelledby="try">
       <div class="two">
-        <h2 id="try">Run it yourself</h2>
+        <h2 id="try">Install</h2>
         <div>
 <pre class="cli"><span class="k">$</span> git clone https://github.com/GoodAncestor/forge
 <span class="k">$</span> cd forge &amp;&amp; uv sync
