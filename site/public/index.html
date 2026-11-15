@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forge — an agent-operated model lab</title>
+<meta name="description" content="Forge is the Good Ancestor Foundation's open toolkit for training, fine-tuning, quantizing and editing models on a shared GPU fleet. Agents do the work; people approve it.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='14' width='24' height='6' rx='1' fill='%232E5C9A'/%3E%3Crect x='10' y='20' width='12' height='8' fill='%23A8692F'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --scale:   #E9ECEE;  /* mill scale: page */
+    --plate:   #F6F7F8;  /* raised surface */
+    --ink:     #1D2329;  /* graphite */
+    --ink-2:   #4A5560;
+    --rule:    #C9CFD4;
+    /* steel temper colours, in heat order; each one marks one exit code */
+    --straw:   #B8962F;
+    --bronze:  #A8692F;
+    --purple:  #6B4A8C;
+    --blue:    #2E5C9A;
+    --go:      #2E7D4F;
+    --code-bg: #1D2329;
+    --code-ink:#DCE2E6;
+    --code-dim:#8D99A3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --scale:  #14181C; --plate: #1B2025; --ink: #E6EAED; --ink-2: #A9B3BB; --rule: #2E363D;
+      --straw: #D9C27A; --bronze: #D08A4C; --purple: #A487C4; --blue: #6F9BD6; --go: #5DBB84;
+      --code-bg: #0E1114; --code-ink: #DCE2E6; --code-dim: #7C8891;
+    }
+  }
+  :root[data-theme="dark"] {
+    --scale:  #14181C; --plate: #1B2025; --ink: #E6EAED; --ink-2: #A9B3BB; --rule: #2E363D;
+    --straw: #D9C27A; --bronze: #D08A4C; --purple: #A487C4; --blue: #6F9BD6; --go: #5DBB84;
+    --code-bg: #0E1114; --code-ink: #DCE2E6; --code-dim: #7C8891;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--scale); color: var(--ink);
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-optical-sizing: auto; font-size: 1.0625rem; line-height: 1.55;
+  }
+  a { color: inherit; text-decoration-color: var(--blue); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+  a:hover { color: var(--blue); }
+  :focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; border-radius: 2px; }
+  code, pre { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.9em; }
+
+  .wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+  .measure { max-width: 40rem; }
+
+  header.top { display: flex; justify-content: space-between; align-items: baseline; padding: 1.5rem 0; gap: 1rem; }
+  .mark { font-weight: 750; font-stretch: 80%; font-size: 1.35rem; letter-spacing: -0.01em; text-decoration: none; }
+  .top nav { display: flex; gap: 1.25rem; font-size: 0.95rem; }
+
+  /* hero */
+  .hero { display: grid; grid-template-columns: 1fr; gap: 2.5rem; padding: 3rem 0 4rem; align-items: center; }
+  @media (min-width: 900px) { .hero { grid-template-columns: 1.05fr 1fr; padding: 5rem 0 6rem; } }
+  h1 {
+    font-size: clamp(2.6rem, 6.4vw, 4.6rem); line-height: 0.98; letter-spacing: -0.03em;
+    font-weight: 780; font-stretch: 78%; margin: 0 0 1.5rem;
+  }
+  h1 span { display: block; font-weight: 340; font-stretch: 100%; }
+  .lede { font-size: 1.2rem; color: var(--ink-2); margin: 0 0 1.75rem; max-width: 34rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: center; }
+  .btn {
+    display: inline-block; background: var(--ink); color: var(--scale); text-decoration: none;
+    padding: 0.7rem 1.15rem; font-weight: 600; border-radius: 3px;
+  }
+  .btn:hover { background: var(--blue); color: #fff; }
+
+  /* the flag */
+  .flag {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 6px;
+    padding: 1.4rem 1.4rem 1.2rem; font-family: "IBM Plex Mono", monospace; font-size: 0.92rem; line-height: 1.7;
+    box-shadow: 0 1px 0 var(--rule), 0 24px 48px -28px rgba(20,24,28,0.55);
+  }
+  .flag .file { color: var(--code-dim); font-size: 0.8rem; margin-bottom: 0.6rem; }
+  .flag pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .k { color: var(--code-dim); }
+  .toggle {
+    font: inherit; cursor: pointer; border: 0; border-radius: 3px; padding: 0 0.45rem;
+    background: #3A2A20; color: #F0B98A; box-shadow: inset 0 0 0 1px #A8692F;
+  }
+  .toggle[aria-pressed="true"] { background: #1E3527; color: #9FE0B6; box-shadow: inset 0 0 0 1px #5DBB84; }
+  .toggle:hover { filter: brightness(1.2); }
+  .hint { color: var(--code-dim); font-size: 0.78rem; }
+  .run { border-top: 1px dashed #3A444D; margin-top: 1rem; padding-top: 0.9rem; min-height: 4.6em; }
+  .out-refused { color: #F0B98A; }
+  .out-ok { color: #9FE0B6; }
+  .run .line { display: block; }
+  @media (prefers-reduced-motion: no-preference) {
+    .run .line { animation: type 0.35s steps(18, end) both; }
+    .run .line:nth-child(2) { animation-delay: 0.25s; }
+    .run .line:nth-child(3) { animation-delay: 0.5s; }
+    @keyframes type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+  }
+  .caption { font-size: 0.88rem; color: var(--ink-2); margin: 0.8rem 0 0; }
+
+  /* sections */
+  section { padding: 3.5rem 0; border-top: 1px solid var(--rule); }
+  h2 { font-size: clamp(1.7rem, 3.2vw, 2.3rem); line-height: 1.1; letter-spacing: -0.02em; font-weight: 720; font-stretch: 85%; margin: 0 0 1.25rem; }
+  p { margin: 0 0 1rem; }
+
+  .two { display: grid; gap: 2rem; }
+  @media (min-width: 820px) { .two { grid-template-columns: 1fr 1.6fr; gap: 4rem; } }
+
+  dl.parts { margin: 0; }
+  dl.parts div { padding: 1.1rem 0; border-bottom: 1px solid var(--rule); }
+  dl.parts div:first-child { padding-top: 0; }
+  dl.parts dt { font-weight: 680; font-size: 1.15rem; margin-bottom: 0.25rem; }
+  dl.parts dd { margin: 0; color: var(--ink-2); }
+
+  .duties { list-style: none; padding: 0; margin: 0 0 1.25rem; }
+  .duties li { font-size: clamp(1.4rem, 2.8vw, 1.95rem); line-height: 1.2; font-weight: 600; letter-spacing: -0.015em; padding: 0.35rem 0; }
+  .duties li em { font-style: normal; font-weight: 340; color: var(--ink-2); }
+
+  /* exit codes */
+  .codes { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0; margin-top: 1.5rem; border-radius: 6px; overflow: hidden; }
+  .code { padding: 1.2rem 1.2rem 1.4rem; color: #fff; }
+  .code b { display: block; font-family: "IBM Plex Mono", monospace; font-size: 2.2rem; font-weight: 500; line-height: 1; margin-bottom: 0.6rem; }
+  .code span { display: block; font-weight: 650; }
+  .code small { display: block; font-size: 0.9rem; opacity: 0.88; margin-top: 0.2rem; line-height: 1.4; }
+  .c2 { background: var(--straw); color: #22190A; }
+  .c3 { background: var(--bronze); }
+  .c4 { background: var(--purple); }
+  .c75 { background: var(--blue); }
+  :root[data-theme="dark"] .c3, :root[data-theme="dark"] .c4, :root[data-theme="dark"] .c75 { color: #101316; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .c3, :root:not([data-theme="light"]) .c4, :root:not([data-theme="light"]) .c75 { color: #101316; } }
+
+  .recipes { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+  .recipes li { font-family: "IBM Plex Mono", monospace; font-size: 0.85rem; padding: 0.25rem 0.6rem; border: 1px solid var(--rule); border-radius: 3px; background: var(--plate); }
+
+  pre.cli { background: var(--code-bg); color: var(--code-ink); padding: 1.2rem 1.3rem; border-radius: 6px; overflow-x: auto; line-height: 1.7; margin: 0 0 1rem; }
+  pre.cli .k { color: var(--code-dim); }
+
+  footer { border-top: 1px solid var(--rule); padding: 2rem 0 3rem; color: var(--ink-2); font-size: 0.95rem; }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; }
+  footer nav { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="mark" href="/">forge</a>
+    <nav aria-label="Primary">
+      <a href="https://github.com/GoodAncestor/forge">Source</a>
+      <a href="https://github.com/GoodAncestor/forge/blob/main/RUNBOOK.md">Runbook</a>
+      <a href="https://status.goodancestor.com/">Fleet status</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div>
+        <h1>Agents do the work.<span>A person flips the flag.</span></h1>
+        <p class="lede">Forge is the Good Ancestor Foundation's open toolkit for running model work on hardware we own: training, fine-tuning, quantization and model surgery on a shared GPU fleet, operated by AI agents and governed by people.</p>
+        <div class="actions">
+          <a class="btn" href="https://github.com/GoodAncestor/forge">Read the source on GitHub</a>
+          <a href="#human">What the human does</a>
+        </div>
+      </div>
+
+      <figure style="margin:0">
+        <div class="flag" id="flag">
+          <div class="file">datasets/manifest.yaml</div>
+<pre><span class="k">- name:</span> llama-nemotron-post-training
+  <span class="k">source:</span> hf://nvidia/Llama-Nemotron-Post-Training-Dataset
+  <span class="k">license:</span> cc-by-4.0
+  <span class="k">approved:</span> <button class="toggle" id="toggle" type="button" aria-pressed="false" aria-describedby="flag-hint">false</button> <span class="hint" id="flag-hint">← flip it</span></pre>
+          <div class="run" id="run" aria-live="polite"></div>
+        </div>
+        <figcaption class="caption">An example manifest entry. Agents can propose a dataset, but only a person, through a reviewed pull request, can set <code>approved: true</code>.</figcaption>
+      </figure>
+    </div>
+
+    <section aria-labelledby="why">
+      <div class="two">
+        <h2 id="why">Why it exists</h2>
+        <div class="measure">
+          <p>Running models on a real fleet is full of small, error-prone decisions: which CUDA and PyTorch stack fits which GPU generation, which datasets are cleared for use, whether a GPU is free or serving live traffic, whether a job saved a checkpoint before it stopped.</p>
+          <p>Forge turns each of those into a small, tested command with machine-readable output. An agent can operate the fleet without improvising, and every consequential step leaves a record a person can audit.</p>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="parts">
+      <div class="two">
+        <h2 id="parts">What's in it</h2>
+        <dl class="parts measure">
+          <div>
+            <dt>An environment for each GPU class</dt>
+            <dd>Ada, Blackwell, datacenter and ROCm machines each get their own pinned lockfile, so the software always matches the hardware. A weekly job proposes updates as a pull request, and a person smoke-tests them on the real GPU before merging.</dd>
+          </div>
+          <div>
+            <dt>A governed dataset archive</dt>
+            <dd>One manifest lists every dataset with its source, license, size and storage path. Fetches are refused for anything unapproved, over the size cap, or of unknown size.</dd>
+          </div>
+          <div>
+            <dt>Runs that share the fleet safely</dt>
+            <dd>Every job holds a lease with a heartbeat, so two agents never fight over one GPU, and touching a machine that serves production raises a loud warning. Runs can resume, and each one writes a signed record of exactly what happened.</dd>
+          </div>
+          <div>
+            <dt>Recipes for common jobs</dt>
+            <dd>Declarative YAML for each kind of work, pinned to the environment it needs.
+              <ul class="recipes" aria-label="Recipes">
+                <li>LoRA SFT</li><li>DPO</li><li>GRPO</li><li>AWQ</li><li>GGUF</li><li>NVFP4</li><li>abliteration</li><li>expert pruning</li>
+              </ul>
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section aria-labelledby="human" id="human">
+      <div class="two">
+        <h2>The human's job is small on purpose</h2>
+        <div class="measure">
+          <ul class="duties">
+            <li>Review the pull requests. <em>Agents propose changes. None merge themselves.</em></li>
+            <li>Decide what's approved. <em>The <code>approved:</code> flags belong to people.</em></li>
+          </ul>
+          <p>Everything else is mechanical, tested and automated. Approval gates are final: a refused fetch stays refused until a person changes the manifest, and agents don't work around it.</p>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="codes-h">
+      <h2 id="codes-h">Failures that say what they are</h2>
+      <p class="measure">Every Forge command exits with a code that tells a person or an agent what kind of stop it was, so a refusal is never mistaken for a crash.</p>
+      <div class="codes">
+        <div class="code c2"><b>2</b><span>Refused</span><small>A gate said no. Wait for a human decision; don't retry.</small></div>
+        <div class="code c3"><b>3</b><span>Job failed</span><small>The work itself broke. Read the run record.</small></div>
+        <div class="code c4"><b>4</b><span>Unreachable</span><small>Infrastructure didn't answer. Safe to retry later.</small></div>
+        <div class="code c75"><b>75</b><span>Checkpointed</span><small>Paused cleanly with progress saved. Resume it.</small></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="try">
+      <div class="two">
+        <h2 id="try">Run it yourself</h2>
+        <div>
+<pre class="cli"><span class="k">$</span> git clone https://github.com/GoodAncestor/forge
+<span class="k">$</span> cd forge &amp;&amp; uv sync
+<span class="k">$</span> uv run forge data list      <span class="k"># what exists, what's approved</span>
+<span class="k">$</span> uv run forge lease status   <span class="k"># who holds which GPU</span></pre>
+          <p class="measure">Add <code>--json</code> to any command for machine-readable output; that's how agents drive it. Interfaces may change. The safety principles will not.</p>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="who">
+      <div class="two">
+        <h2 id="who">Who runs it</h2>
+        <div class="measure">
+          <p>The <a href="https://goodancestor.com/">Good Ancestor Foundation</a> uses Forge in production on its own fleet. You can see that fleet live on our <a href="https://status.goodancestor.com/">status page</a>. We publish Forge to help others stand up local, sovereign AI infrastructure of their own.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>Forge is a Good Ancestor Foundation project.</span>
+    <nav aria-label="Footer">
+      <a href="https://github.com/GoodAncestor/forge">GitHub</a>
+      <a href="https://status.goodancestor.com/">Status</a>
+      <a href="https://goodancestor.com/">goodancestor.com</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var btn = document.getElementById('toggle');
+    var run = document.getElementById('run');
+    var hint = document.getElementById('flag-hint');
+    var cmd = '<span class="line"><span class="k">$</span> forge data fetch llama-nemotron-post-training</span>';
+    function render(on) {
+      btn.textContent = on ? 'true' : 'false';
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      run.innerHTML = cmd + (on
+        ? '<span class="line out-ok">fetching (resumable) to the archive…</span><span class="line out-ok">done · exit 0</span>'
+        : '<span class="line out-refused">refused: dataset is not approved</span><span class="line out-refused">exit 2</span>');
+    }
+    btn.addEventListener('click', function () {
+      hint.textContent = '';
+      render(btn.getAttribute('aria-pressed') !== 'true');
+    });
+    render(false);
+  })();
+</script>
+</body>
+</html>

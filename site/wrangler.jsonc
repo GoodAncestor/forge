@@ -1,0 +1,10 @@
+{
+  // Static site for forge.goodancestor.com. Assets only, no Worker code.
+  // Deploy: `npx wrangler deploy` from this directory.
+  "name": "forge-site",
+  "compatibility_date": "2026-11-01",
+  "account_id": "3e3b86937ebd0c2f030202c853d2d393",
+  "assets": { "directory": "./public", "not_found_handling": "404-page" },
+  "routes": [{ "pattern": "forge.goodancestor.com", "custom_domain": true }],
+  "workers_dev": false
+}
