@@ -1,7 +1,10 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
+
+import pytest
 
 from forge import run as run_mod
 from forge.lease import LeaseRefused
@@ -191,6 +194,7 @@ def test_child_env_prepends_to_existing_pythonpath(tmp_path, monkeypatch):
     assert env["PYTHONPATH"] == str(run_mod.REPO_ROOT / "src") + os.pathsep + "/some/other/path"
 
 
+@pytest.mark.skipif(shutil.which("uv") is None, reason="needs uv")
 def test_child_env_pythonpath_delivers_forge_via_real_uv_project(tmp_path):
     """Exercises the REAL uv-project composition run.execute() uses (`uv run
     --project envs/<profile> ...`) against a tmp minimal uv project standing
